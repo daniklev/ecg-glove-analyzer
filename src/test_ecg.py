@@ -59,7 +59,7 @@ class EcgGlove:
                                             lsb = frame[2 * ch]
                                             msb = frame[2 * ch + 1]
                                             # Combine bytes matching Java implementation
-                                            value = ((msb << 8) | (lsb & 0xFF))
+                                            value = (msb << 8) | (lsb & 0xFF)
                                             # Convert to signed 16-bit if needed
                                             if value > 32767:
                                                 value -= 65536

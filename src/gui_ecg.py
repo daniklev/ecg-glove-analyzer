@@ -175,8 +175,14 @@ class EcgAnalyzerGUI(QMainWindow):
         # Set dark theme for the application
         self.setStyleSheet(
             """
-            QMainWindow { background-color: #2b2b2b; }
-            QLabel { color: #e0e0e0; }
+            QMainWindow, QWidget {
+                background-color: #2b2b2b;
+                color: #e0e0e0;
+            }
+            QLabel {
+                color: #e0e0e0;
+                background-color: transparent;
+            }
             QPushButton {
                 background-color: #3b3b3b;
                 color: #e0e0e0;
@@ -189,12 +195,14 @@ class EcgAnalyzerGUI(QMainWindow):
             }
             QGroupBox {
                 color: #e0e0e0;
+                background-color: #2b2b2b;
                 border: 1px solid #505050;
                 border-radius: 5px;
                 margin-top: 20px;
             }
             QGroupBox::title {
                 color: #e0e0e0;
+                background-color: transparent;
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
                 padding: 5px;
@@ -215,14 +223,27 @@ class EcgAnalyzerGUI(QMainWindow):
             }
             QCheckBox {
                 color: #e0e0e0;
+                background-color: transparent;
             }
             QScrollArea {
                 background-color: #2b2b2b;
                 border: 1px solid #505050;
             }
-        """
+            QTabWidget::pane {
+                background-color: #2b2b2b;
+                border: 1px solid #505050;
+            }
+            QTabBar::tab {
+                background-color: #3b3b3b;
+                color: #e0e0e0;
+                padding: 5px;
+                border: 1px solid #505050;
+            }
+            QTabBar::tab:selected {
+                background-color: #454545;
+            }
+            """
         )
-
         # Create main widget and layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
@@ -343,12 +364,12 @@ class EcgAnalyzerGUI(QMainWindow):
         # Set initial splitter sizes
         splitter.setSizes([300, 900])
 
-                # Add all elements to sidebar
+        # Add all elements to sidebar
         sidebar_layout.addWidget(file_group)
         sidebar_layout.addWidget(nk_settings)
         sidebar_layout.addWidget(self.analyze_btn)
         sidebar_layout.addStretch()
-        
+
         # Add version label
         version_label = QLabel(f"ECG Analyzer {APP_VERSION}")
         version_label.setStyleSheet("color: #808080; padding: 5px;")  # Gray color
