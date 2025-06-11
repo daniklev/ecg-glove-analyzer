@@ -18,8 +18,8 @@ class EcgGlove:
         :param sampling_rate: Sampling rate of the ECG device (Hz). Default 500 Hz.
         """
         self.sampling_rate = sampling_rate
-        # This dictionary will hold the decoded ECG lead signals (as numpy arrays)
         self.lead_signals = {}
+        self.quality_scores = {}
 
     def decode_data(self, data_bytes: bytes) -> None:
         """
@@ -40,10 +40,10 @@ class EcgGlove:
                     header_sum = sum(data_bytes[i : i + 7]) & 0xFF  # sum mod 256
                     packet_type = data_bytes[i + 5]  # packet type indicator in header
                     if header_sum == 0:  # valid header
+                        # Inside the data packet processing section, update the value calculation:
                         if packet_type == 0x51:  # ECG data packet
                             # Ensure we have enough bytes for the data packet (81 bytes: 80 data + 1 checksum)
                             if i + 7 + 81 <= size:
-                                # Data payload starts at i+7 and spans 81 bytes (including its checksum)
                                 data_start = i + 7
                                 data_chunk = data_bytes[data_start : data_start + 81]
                                 # Verify data packet checksum (sum of 81 bytes should mod 256 == 0)
@@ -55,15 +55,14 @@ class EcgGlove:
                                         ]
                                         # Each frame contains 8 little-endian 16-bit samples (one per channel)
                                         for ch in range(8):
-                                            # Little-endian int16: byte order [LSB, MSB]
+                                            # Get LSB and MSB
                                             lsb = frame[2 * ch]
                                             msb = frame[2 * ch + 1]
-                                            # Combine bytes and interpret as signed 16-bit
-                                            value = (msb << 8) | lsb
-                                            if value & 0x8000:  # if sign bit is set
-                                                value = (
-                                                    value - 0x10000
-                                                )  # two's complement conversion
+                                            # Combine bytes matching Java implementation
+                                            value = ((msb << 8) | (lsb & 0xFF))
+                                            # Convert to signed 16-bit if needed
+                                            if value > 32767:
+                                                value -= 65536
                                             channels[ch].append(value)
                                 # Move index past this data packet
                                 i = (

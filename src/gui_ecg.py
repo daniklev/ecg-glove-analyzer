@@ -21,12 +21,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qt import NavigationToolbar2QT
 from matplotlib.figure import Figure
 import numpy as np
 from test_ecg import EcgGlove
 import math
+from typing import Optional, Dict, Any
 
 # Default settings
 DEFAULT_SIGNAL_COLOR = "#00ffff"  # cyan
@@ -54,11 +55,13 @@ class CollapsibleBox(QGroupBox):
 
 
 class EcgTab(QWidget):
-    def __init__(self, filepath, config=None, parent=None):
+    def __init__(
+        self, filepath: str, config: Optional[Dict[str, Any]] = None, parent=None
+    ):
         super().__init__(parent)
         self.filepath = filepath
-        self.config = config or {}  # Store analysis configuration
-        self.ecg_glove = None
+        self.config = config or {}
+        self.ecg_glove: Optional[EcgGlove] = None
         self.axes = []
         self._syncing = False
 
@@ -79,7 +82,7 @@ class EcgTab(QWidget):
 
         # Results display
         self.results_text = QLabel()
-        self.results_text.setAlignment(Qt.AlignTop)
+        self.results_text.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.results_text.setStyleSheet(
             "background-color: #3b3b3b; padding: 10px; border-radius: 5px; margin: 5px;"
         )
@@ -90,8 +93,10 @@ class EcgTab(QWidget):
 
         # Add matplotlib figure with navigation toolbar
         self.figure = Figure(figsize=(12, 8), facecolor="#2b2b2b")
-        self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self)
+        # self.canvas = FigureCanvas(self.figure)
+        # self.toolbar = NavigationToolbar(self.canvas, self)
+        self.canvas = FigureCanvasQTAgg(self.figure)
+        self.toolbar = NavigationToolbar2QT(self.canvas, self)
 
         layout.addWidget(top_info)
         layout.addWidget(self.toolbar)
@@ -223,7 +228,7 @@ class EcgAnalyzerGUI(QMainWindow):
         layout = QHBoxLayout(main_widget)
 
         # Create splitter for sidebar and main area
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
         # Create main widget and layout
@@ -232,7 +237,7 @@ class EcgAnalyzerGUI(QMainWindow):
         layout = QHBoxLayout(main_widget)
 
         # Create splitter for sidebar and main area
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
         # Create and setup sidebar
