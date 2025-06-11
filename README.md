@@ -9,7 +9,7 @@
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/ecg-glove-analyzer.git
+git clone https://github.com/daniklev/ecg-glove-analyzer.git
 cd ecg-glove-analyzer
 ```
 
