@@ -33,6 +33,7 @@ from typing import Optional, Dict, Any
 DEFAULT_SIGNAL_COLOR = "#00ffff"  # cyan
 DEFAULT_GRID_COLOR = "#404040"  # dark gray
 VOLTAGE_SCALE = 0.5  # mV per division
+APP_VERSION = "1.0.0"
 
 
 class CollapsibleBox(QGroupBox):
@@ -341,6 +342,18 @@ class EcgAnalyzerGUI(QMainWindow):
 
         # Set initial splitter sizes
         splitter.setSizes([300, 900])
+
+                # Add all elements to sidebar
+        sidebar_layout.addWidget(file_group)
+        sidebar_layout.addWidget(nk_settings)
+        sidebar_layout.addWidget(self.analyze_btn)
+        sidebar_layout.addStretch()
+        
+        # Add version label
+        version_label = QLabel(f"ECG Analyzer {APP_VERSION}")
+        version_label.setStyleSheet("color: #808080; padding: 5px;")  # Gray color
+        version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        sidebar_layout.addWidget(version_label)
 
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
