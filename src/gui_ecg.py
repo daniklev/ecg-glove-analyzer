@@ -11,12 +11,9 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QLabel,
     QGroupBox,
-    QCheckBox,
-    QScrollArea,
     QSplitter,
     QMessageBox,
     QTabWidget,
-    QToolButton,
     QComboBox,
 )
 from PyQt5.QtCore import Qt
@@ -25,15 +22,14 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT
 from matplotlib.figure import Figure
 import numpy as np
-from test_ecg import EcgGlove
-import math
+from ecg_glove import EcgGlove
 from typing import Optional, Dict, Any
 
 # Default settings
 DEFAULT_SIGNAL_COLOR = "#00ffff"  # cyan
 DEFAULT_GRID_COLOR = "#404040"  # dark gray
 VOLTAGE_SCALE = 0.5  # mV per division
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 
 class CollapsibleBox(QGroupBox):
@@ -253,15 +249,6 @@ class EcgAnalyzerGUI(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # Create main widget and layout
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        layout = QHBoxLayout(main_widget)
-
-        # Create splitter for sidebar and main area
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        layout.addWidget(splitter)
-
         # Create and setup sidebar
         sidebar = QWidget()
         sidebar_layout = QVBoxLayout(sidebar)
@@ -323,30 +310,20 @@ class EcgAnalyzerGUI(QMainWindow):
         peak_layout.addWidget(self.peak_method)
         peak_group.setLayout(peak_layout)
 
-        # Quality Assessment
-        quality_group = QGroupBox("Quality Assessment")
-        quality_layout = QVBoxLayout()
-        self.quality_method = QComboBox()
-        self.quality_method.addItems(["averageQRS", "zhao2018"])
-        self.quality_method.setCurrentText("averageQRS")  # Default to averageQRS
-        quality_layout.addWidget(self.quality_method)
-        quality_group.setLayout(quality_layout)
-
         # Add all settings groups
         nk_settings_layout.addWidget(clean_group)
         nk_settings_layout.addWidget(peak_group)
-        nk_settings_layout.addWidget(quality_group)
         nk_settings.setLayout(nk_settings_layout)
 
         # Analysis button
-        self.analyze_btn = QPushButton("Analyze")
-        self.analyze_btn.clicked.connect(self.analyze_data)
-        self.analyze_btn.setEnabled(False)
+        self.process_btn = QPushButton("Process")
+        self.process_btn.clicked.connect(self.process_data)
+        self.process_btn.setEnabled(False)
 
         # Add all elements to sidebar
         sidebar_layout.addWidget(file_group)
         sidebar_layout.addWidget(nk_settings)
-        sidebar_layout.addWidget(self.analyze_btn)
+        sidebar_layout.addWidget(self.process_btn)
         sidebar_layout.addStretch()
 
         # Create main display area with tabs
@@ -363,12 +340,6 @@ class EcgAnalyzerGUI(QMainWindow):
 
         # Set initial splitter sizes
         splitter.setSizes([300, 900])
-
-        # Add all elements to sidebar
-        sidebar_layout.addWidget(file_group)
-        sidebar_layout.addWidget(nk_settings)
-        sidebar_layout.addWidget(self.analyze_btn)
-        sidebar_layout.addStretch()
 
         # Add version label
         version_label = QLabel(f"ECG Analyzer {APP_VERSION}")
@@ -388,10 +359,10 @@ class EcgAnalyzerGUI(QMainWindow):
         items = self.file_list.selectedItems()
         if items:
             self.current_file = items[0].text()
-            self.analyze_btn.setEnabled(True)
+            self.process_btn.setEnabled(True)
         else:
             self.current_file = None
-            self.analyze_btn.setEnabled(False)
+            self.process_btn.setEnabled(False)
 
     def get_selected_leads(self):
         return [lead for lead, cb in self.lead_checks.items() if cb.isChecked()]
@@ -408,7 +379,7 @@ class EcgAnalyzerGUI(QMainWindow):
             del self.tabs[key_to_remove]
         self.tab_widget.removeTab(index)
 
-    def analyze_data(self):
+    def process_data(self):
         if not self.current_file:
             return
 
@@ -417,11 +388,12 @@ class EcgAnalyzerGUI(QMainWindow):
             config = {
                 "clean_method": self.clean_method.currentText(),
                 "peak_method": self.peak_method.currentText(),
-                "quality_method": self.quality_method.currentText(),
             }
 
             # Create configuration key
-            config_key = f"{self.current_file}_{config['clean_method']}_{config['peak_method']}_{config['quality_method']}"
+            config_key = (
+                f"{self.current_file}_{config['clean_method']}_{config['peak_method']}"
+            )
 
             # Create new tab if this configuration doesn't exist
             if config_key not in self.tabs:
@@ -442,25 +414,66 @@ class EcgAnalyzerGUI(QMainWindow):
             # Get selected methods from dropdowns
             clean_method = self.clean_method.currentText()
             peak_method = self.peak_method.currentText()
-            quality_method = self.quality_method.currentText()
 
-            # Get quality scores and analyze
-            tab.ecg_glove.quality_scores = tab.ecg_glove.compute_quality(
-                clean_method=clean_method, quality_method=quality_method
-            )
+            # Analyze quality first
+            quality_results = tab.ecg_glove.compute_quality(clean_method=clean_method)
 
-            results = tab.ecg_glove.analyze(
+            # Store quality scores and measurement results
+            tab.quality_scores = quality_results
+
+            # Analyze ECG if quality is acceptable
+            results = tab.ecg_glove.process(
                 clean_method=clean_method, peak_method=peak_method
             )
 
-            # Show results in top info panel
-            analysis_lead = results.get("AnalysisLead", "N/A")
-            hr = results.get("HeartRate_BPM")
+            # Format results for display
+            # result_text = "Analysis Results:\n\n"
+            result_text = f"Analysis Lead: {results['AnalysisLead']}\n\n"
 
-            result_text = f"Analysis Results:\n\n"
-            result_text += f"Lead Used: {analysis_lead}\n"
-            if hr is not None:
-                result_text += f"Heart Rate: {hr:.1f} BPM\n"
+            # Add measurements
+            if "measurements" in results:
+                result_text += "ECG Measurements:\n"
+                measurements = results["measurements"]
+                if measurements.get("HeartRate_BPM"):
+                    result_text += (
+                        f"Heart Rate: {measurements['HeartRate_BPM']:.1f} BPM\n"
+                    )
+                if measurements.get("RR_Interval_ms"):
+                    result_text += (
+                        f"RR Interval: {measurements['RR_Interval_ms']:.0f} ms\n"
+                    )
+                # if measurements.get("P_Duration_ms"):
+                #     result_text += (
+                #         f"P Duration: {measurements['P_Duration_ms']:.0f} ms\n"
+                #     )
+                # if measurements.get("PR_Interval_ms"):
+                #     result_text += (
+                #         f"PR Interval: {measurements['PR_Interval_ms']:.0f} ms\n"
+                #     )
+                # if measurements.get("QRS_Duration_ms"):
+                #     result_text += (
+                #         f"QRS Duration: {measurements['QRS_Duration_ms']:.0f} ms\n"
+                #     )
+                # if measurements.get("QT_Interval_ms"):
+                #     result_text += (
+                #         f"QT Interval: {measurements['QT_Interval_ms']:.0f} ms\n"
+                #     )
+                # if measurements.get("QTc_Interval_ms"):
+                #     result_text += (
+                #         f"QTc Interval: {measurements['QTc_Interval_ms']:.0f} ms\n"
+                #     )
+
+            # Add overall quality results
+            if "overall_quality" in quality_results:
+                overall_quality = quality_results["overall_quality"]
+                result_text += f"\nOverall Signal Quality: {overall_quality:.2f}\n"
+
+                # # Add quality warnings if any
+                # if quality_results.get("problem_summary"):
+                #     result_text += "\nQuality Issues:\n"
+                #     for problem in quality_results["problem_summary"]:
+                #         result_text += f"- {problem}\n"
+
             tab.results_text.setText(result_text)
 
             # Update plots
@@ -490,8 +503,8 @@ class EcgAnalyzerGUI(QMainWindow):
 
         # Get quality scores
         quality_scores = (
-            tab.ecg_glove.quality_scores
-            if hasattr(tab.ecg_glove, "quality_scores")
+            tab.quality_scores.get("lead_quality", {})
+            if hasattr(tab, "quality_scores")
             else {}
         )
 
@@ -558,23 +571,54 @@ class EcgAnalyzerGUI(QMainWindow):
                         linewidth=0.8,
                         antialiased=True,
                     )
-                    # Add minimal lead label with quality score
-                    quality_text = f"{lead}"
+                    # Add lead label with quality information
                     if lead in quality_scores:
-                        score = quality_scores[lead]
-                        if isinstance(score, float):
-                            quality_text += f" ({score:.2f})"
+                        problems = []
+                        lead_quality = quality_scores[lead]
+                        quality_text = (
+                            f"{lead} ({lead_quality.get('nk_quality', 'N/A'):.2f})"
+                        )
+
+                        if lead_quality.get("Low_SNR"):
+                            color = "#ff6b6b"  # Red for poor quality
+                        elif lead_quality.get("Muscle_Artifact") or lead_quality.get(
+                            "Powerline_Interference"
+                        ):
+                            color = "#ffd93d"  # Yellow for moderate issues
                         else:
-                            quality_text += f" ({score})"
-                    ax.text(
-                        0.02,
-                        0.85,
-                        quality_text,
-                        transform=ax.transAxes,
-                        fontsize=8,
-                        color="white",
-                        alpha=0.8,
-                    )
+                            color = "#6bff6b"  # Green for good quality
+
+                        if lead_quality.get("Muscle_Artifact"):
+                            problems.append("MA")
+                        if lead_quality.get("Powerline_Interference"):
+                            problems.append("PI")
+                        if lead_quality.get("Baseline_Drift"):
+                            problems.append("BD")
+                        if lead_quality.get("Bad_Electrode_Contact"):
+                            problems.append("EC")
+
+                        if problems:
+                            quality_text += f" [{', '.join(problems)}]"
+
+                        ax.text(
+                            0.02,
+                            0.85,
+                            quality_text,
+                            transform=ax.transAxes,
+                            fontsize=8,
+                            color=color,
+                            alpha=0.8,
+                        )
+                    else:
+                        ax.text(
+                            0.02,
+                            0.85,
+                            lead,
+                            transform=ax.transAxes,
+                            fontsize=8,
+                            color="white",
+                            alpha=0.8,
+                        )
 
                 # Remove all unnecessary elements
                 ax.set_xticks([])
