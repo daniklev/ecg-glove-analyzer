@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QFileDialog,
     QListWidget,
+    QListWidgetItem,
     QLabel,
     QGroupBox,
     QSplitter,
@@ -24,6 +25,9 @@ from matplotlib.figure import Figure
 import numpy as np
 from ecg_glove import EcgGlove
 from typing import Optional, Dict, Any
+
+# Role to store full file path in QListWidgetItem data
+USER_ROLE = 32  # Qt.UserRole value
 
 # Default settings
 DEFAULT_SIGNAL_COLOR = "#00ffff"  # cyan
@@ -351,14 +355,19 @@ class EcgAnalyzerGUI(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
         if folder:
             self.file_list.clear()
-            for file in os.listdir(folder):
-                if file.endswith(".ret"):
-                    self.file_list.addItem(os.path.join(folder, file))
+            # list and sort by filename, display basename only
+            ret_files = sorted([f for f in os.listdir(folder) if f.endswith('.ret')])
+            for fname in ret_files:
+                item = QListWidgetItem(fname)
+                # store full path for later retrieval
+                item.setData(USER_ROLE, os.path.join(folder, fname))
+                self.file_list.addItem(item)
 
     def file_selected(self):
         items = self.file_list.selectedItems()
         if items:
-            self.current_file = items[0].text()
+            # retrieve full path stored in item data
+            self.current_file = items[0].data(USER_ROLE)
             self.process_btn.setEnabled(True)
         else:
             self.current_file = None
@@ -487,6 +496,11 @@ class EcgAnalyzerGUI(QMainWindow):
 
     def plot_ecg_data(self, tab):
         if not tab.ecg_glove:
+            return
+        # Skip plotting if no signal data available
+        if not any(arr.size > 0 for arr in tab.ecg_glove.lead_signals.values()):
+            tab.figure.clear()
+            tab.canvas.draw_idle()
             return
 
         tab.figure.clear()

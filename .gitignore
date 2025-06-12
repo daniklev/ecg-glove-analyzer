@@ -1,6 +1,8 @@
 # Data and Environment
-/Ecg12Data/
+Ecg12Data/
+ECG12_RET_PNG_PDF/
 /venv/
+/tools/
 
 # Python
 __pycache__/
