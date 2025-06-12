@@ -33,7 +33,7 @@ USER_ROLE = 32  # Qt.UserRole value
 DEFAULT_SIGNAL_COLOR = "#00ffff"  # cyan
 DEFAULT_GRID_COLOR = "#404040"  # dark gray
 VOLTAGE_SCALE = 0.5  # mV per division
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 
 class CollapsibleBox(QGroupBox):
@@ -451,37 +451,37 @@ class EcgAnalyzerGUI(QMainWindow):
                     result_text += (
                         f"RR Interval: {measurements['RR_Interval_ms']:.0f} ms\n"
                     )
-                # if measurements.get("P_Duration_ms"):
-                #     result_text += (
-                #         f"P Duration: {measurements['P_Duration_ms']:.0f} ms\n"
-                #     )
-                # if measurements.get("PR_Interval_ms"):
-                #     result_text += (
-                #         f"PR Interval: {measurements['PR_Interval_ms']:.0f} ms\n"
-                #     )
-                # if measurements.get("QRS_Duration_ms"):
-                #     result_text += (
-                #         f"QRS Duration: {measurements['QRS_Duration_ms']:.0f} ms\n"
-                #     )
-                # if measurements.get("QT_Interval_ms"):
-                #     result_text += (
-                #         f"QT Interval: {measurements['QT_Interval_ms']:.0f} ms\n"
-                #     )
-                # if measurements.get("QTc_Interval_ms"):
-                #     result_text += (
-                #         f"QTc Interval: {measurements['QTc_Interval_ms']:.0f} ms\n"
-                #     )
+                if measurements.get("P_Duration_ms"):
+                    result_text += (
+                        f"P Duration: {measurements['P_Duration_ms']:.0f} ms\n"
+                    )
+                if measurements.get("PR_Interval_ms"):
+                    result_text += (
+                        f"PR Interval: {measurements['PR_Interval_ms']:.0f} ms\n"
+                    )
+                if measurements.get("QRS_Duration_ms"):
+                    result_text += (
+                        f"QRS Duration: {measurements['QRS_Duration_ms']:.0f} ms\n"
+                    )
+                if measurements.get("QT_Interval_ms"):
+                    result_text += (
+                        f"QT Interval: {measurements['QT_Interval_ms']:.0f} ms\n"
+                    )
+                if measurements.get("QTc_Interval_ms"):
+                    result_text += (
+                        f"QTc Interval: {measurements['QTc_Interval_ms']:.0f} ms\n"
+                    )
 
             # Add overall quality results
             if "overall_quality" in quality_results:
                 overall_quality = quality_results["overall_quality"]
                 result_text += f"\nOverall Signal Quality: {overall_quality:.2f}\n"
 
-                # # Add quality warnings if any
-                # if quality_results.get("problem_summary"):
-                #     result_text += "\nQuality Issues:\n"
-                #     for problem in quality_results["problem_summary"]:
-                #         result_text += f"- {problem}\n"
+            #     # Add quality warnings if any
+            #     if quality_results.get("problem_summary"):
+            #         result_text += "\nQuality Issues:\n"
+            #         for problem in quality_results["problem_summary"]:
+            #             result_text += f"- {problem}\n"
 
             tab.results_text.setText(result_text)
 
@@ -498,7 +498,8 @@ class EcgAnalyzerGUI(QMainWindow):
         if not tab.ecg_glove:
             return
         # Skip plotting if no signal data available
-        if not any(arr.size > 0 for arr in tab.ecg_glove.lead_signals.values()):
+        # if not any(arr.size > 0 for arr in tab.ecg_glove.lead_signals.values()):
+        if not any(arr.size > 0 for arr in tab.ecg_glove.cleaned_signals.values()):
             tab.figure.clear()
             tab.canvas.draw_idle()
             return
@@ -531,7 +532,8 @@ class EcgAnalyzerGUI(QMainWindow):
         # Pre-calculate signal data and find ranges
         for row_leads in lead_order:
             for lead in row_leads:
-                signal = tab.ecg_glove.lead_signals.get(lead, np.array([]))
+                # signal = tab.ecg_glove.lead_signals.get(lead, np.array([]))
+                signal = tab.ecg_glove.cleaned_signals.get(lead, np.array([]))
                 if signal.size > 0:
                     # Downsample for very large signals (> 10000 points)
                     if signal.size > 10000:
