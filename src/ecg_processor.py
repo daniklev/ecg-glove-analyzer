@@ -1,11 +1,19 @@
 import numpy as np
 from scipy.signal import butter, filtfilt, welch
 import neurokit2 as nk
-from typing import Dict, Any
+from typing import Dict, Any, TypedDict
 import warnings
 import pandas as pd
+from numpy.typing import NDArray
 
 warnings.filterwarnings("ignore")
+
+
+class LeadData(TypedDict):
+    """Type definition for lead data structure."""
+
+    lead_signals: Dict[str, NDArray[np.float64]]
+    cleaned_signals: Dict[str, NDArray[np.float64]]
 
 
 class EcgQualityProcessor:
@@ -49,7 +57,7 @@ class EcgQualityProcessor:
             else self.CLINICAL_LEAD_WEIGHTS
         )
 
-    def analyze_lead_quality(self, signal: np.ndarray) -> Dict[str, Any]:
+    def analyze_lead_quality(self, signal: np.ndarray, cleaned) -> Dict[str, Any]:
         """Analyze the quality of a single ECG lead."""
         results = {
             "Muscle_Artifact": False,
@@ -61,9 +69,6 @@ class EcgQualityProcessor:
             "SNR_dB": None,
             "nk_quality": None,
         }
-
-        # Normalize signal
-        signal = signal - np.mean(signal)
 
         # Calculate power spectrum
         try:
@@ -94,20 +99,9 @@ class EcgQualityProcessor:
                 if low_freq_power / total_power > 0.1:
                     results["Baseline_Drift"] = True
 
-            # Convert signal to float64 to avoid dtype issues
-            signal = np.array(signal, dtype=np.float64)
-
-            # Clean the ECG signal first
-            cleaned = nk.ecg_clean(
-                signal, sampling_rate=self.sampling_rate  # , method=clean_method
-            )
-
-            # Ensure cleaned signal is float64
-            cleaned = np.array(cleaned, dtype=np.float64)
-
             # Compute quality index based on method
             quality_idx = nk.ecg_quality(
-                cleaned, sampling_rate=self.sampling_rate  # , method=quality_method
+                cleaned, sampling_rate=self.sampling_rate
             )
             # For averageQRS and other numeric methods
             quality_idx = np.array(quality_idx, dtype=np.float64)
@@ -138,65 +132,78 @@ class EcgQualityProcessor:
 
         return results
 
-    def analyze_all_leads(self, leads_data: Dict[str, np.ndarray]) -> Dict[str, Any]:
-        """Analyze the quality and measurements of all ECG leads."""
+    def analyze_all_leads(
+        self, data: LeadData
+    ) -> Dict[str, Any]:
+        """
+        Analyze the quality and measurements of all ECG leads.
+
+        Args:
+            data: Dictionary containing raw and cleaned signals for all leads
+                 Format: {
+                     'lead_signals': Dict[str, NDArray],
+                     'cleaned_signals': Dict[str, NDArray]
+                 }
+            clean_method: Method used for ECG signal cleaning
+
+        Returns:
+            Dictionary containing quality analysis and measurements for all leads
+
+        Raises:
+            ValueError: If lead_signals or cleaned_signals are missing
+        """
         results = {
             "lead_quality": {},
-            "lead_measurements": {},
             "overall_quality": None,
             "problem_summary": [],
-            "measurements": {
-                "heart_rate": None,
-                "rr_interval": None,
-                "p_duration": None,
-                "pr_interval": None,
-                "qrs_duration": None,
-                "qt_interval": None,
-                "qtc_interval": None,
-            },
         }
 
-        total_weighted_quality = 0
+        if not data.get("lead_signals") or not data.get("cleaned_signals"):
+            raise ValueError("Both lead_signals and cleaned_signals must be provided")
+
+        total_weighted_quality = 0.0
+        total_weights = 0.0
 
         # Analyze each lead's quality and measurements
-        for lead_name, signal in leads_data.items():
-            # Quality analysis
-            quality_results = self.analyze_lead_quality(signal)
-            # Include NeuroKit-based quality separately
-            results["lead_quality"][lead_name] = quality_results
+        for lead_name, raw_signal in data["lead_signals"].items():
+            if lead_name not in data["cleaned_signals"]:
+                print(f"Warning: No cleaned signal for lead {lead_name}")
+                continue
 
-            # Calculate quality score (0-1)
-            quality_score = self._calculate_lead_quality_score(quality_results)
-            weight = self.lead_weights.get(
-                lead_name, 0.08
-            )  # default weight if not specified
-            total_weighted_quality += quality_score * weight
+            cleaned_signal = data["cleaned_signals"][lead_name]
 
-            # Process ECG measurements for good quality leads
-            if quality_score > 0.7:  # Only process if lead quality is acceptable
-                try:
-                    processed_signal, info = nk.ecg_process(
-                        signal, sampling_rate=self.sampling_rate
+            # Skip invalid signals
+            if raw_signal.size == 0 or cleaned_signal.size == 0:
+                print(f"Warning: Empty signal for lead {lead_name}")
+                continue
+
+            try:
+                # Quality analysis
+                quality_results = self.analyze_lead_quality(raw_signal, cleaned_signal)
+                results["lead_quality"][lead_name] = quality_results
+
+                # Calculate quality score (0-1)
+                quality_score = self._calculate_lead_quality_score(quality_results)
+                weight = self.lead_weights.get(lead_name, 0.08)
+                total_weighted_quality += quality_score * weight
+                total_weights += weight
+
+                # Generate problem description if quality is poor
+                if quality_score < 0.8:
+                    problem_desc = self._generate_problem_description(
+                        lead_name, quality_results
                     )
-                    results["lead_measurements"][lead_name] = (
-                        self._extract_measurements(processed_signal, info)
-                    )
-                except Exception as e:
-                    print(f"Error processing lead {lead_name}: {str(e)}")
+                    if problem_desc:
+                        results["problem_summary"].append(problem_desc)
 
-            # Generate problem description if quality is poor
-            if quality_score < 0.8:
-                problem_desc = self._generate_problem_description(
-                    lead_name, quality_results
-                )
-                if problem_desc:
-                    results["problem_summary"].append(problem_desc)
+            except Exception as e:
+                print(f"Error analyzing lead {lead_name}: {str(e)}")
+                continue
 
-        # Overall quality assessment
-        results["overall_quality"] = total_weighted_quality
-
-        # Calculate final measurements from the best leads
-        self._calculate_final_measurements(results)
+        # Overall quality assessment (normalized by total weights)
+        results["overall_quality"] = (
+            total_weighted_quality / total_weights if total_weights > 0 else 0.0
+        )
 
         return results
 
@@ -214,56 +221,6 @@ class EcgQualityProcessor:
         if quality_results["Low_SNR"]:
             score -= 0.3
         return max(0.0, score)
-
-    def _extract_measurements(
-        self, processed_signal: pd.DataFrame, info: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Extract ECG measurements from processed signal."""
-        ecg_info = info.get("ECG", {})
-        r_peaks = info.get("ECG_R_Peaks", [])
-
-        return {
-            "heart_rate": float(ecg_info.get("Heart_Rate", 0)),
-            "rr_interval": (
-                float(np.mean(np.diff(r_peaks))) / self.sampling_rate * 1000
-                if len(r_peaks) > 1
-                else 0
-            ),
-            "p_duration": float(ecg_info.get("P_Duration", 0)),
-            "pr_interval": float(ecg_info.get("PR_Interval", 0)),
-            "qrs_duration": float(ecg_info.get("QRS_Duration", 0)),
-            "qt_interval": float(ecg_info.get("QT_Interval", 0)),
-            "qtc_interval": float(ecg_info.get("QTc", 0)),
-        }
-
-    def _calculate_final_measurements(self, results: Dict):
-        """Calculate final ECG measurements using the best leads."""
-        measurements = results["lead_measurements"]
-        if not measurements:
-            return
-
-        # For each parameter, collect values from all leads
-        params = [
-            "heart_rate",
-            "rr_interval",
-            "p_duration",
-            "pr_interval",
-            "qrs_duration",
-            "qt_interval",
-            "qtc_interval",
-        ]
-
-        for param in params:
-            values = [m[param] for m in measurements.values() if m[param] is not None]
-            if values:
-                if param in ["qrs_duration", "qt_interval"]:
-                    results["measurements"][param] = np.max(
-                        values
-                    )  # Take maximum for QRS and QT
-                else:
-                    results["measurements"][param] = np.median(
-                        values
-                    )  # Take median for others
 
     def _generate_problem_description(
         self, lead_name: str, quality_results: Dict[str, Any]

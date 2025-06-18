@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QTabWidget,
     QComboBox,
+    QCheckBox,
 )
 from PyQt5.QtCore import Qt
 import matplotlib.pyplot as plt
@@ -72,6 +73,19 @@ class EcgTab(QWidget):
         # Create top info section with horizontal layout
         top_info = QWidget()
         top_info_layout = QHBoxLayout(top_info)
+
+        # Signal type selection
+        signal_type_widget = QWidget()
+        signal_type_layout = QHBoxLayout(signal_type_widget)
+        signal_type_label = QLabel("Signal Type:")
+        self.signal_type_combo = QComboBox()
+        self.signal_type_combo.addItems(["Raw", "Filtered", "Cleaned"])
+        self.signal_type_combo.setCurrentText("Cleaned")
+        self.signal_type_combo.currentTextChanged.connect(self.update_plot)
+        signal_type_layout.addWidget(signal_type_label)
+        signal_type_layout.addWidget(self.signal_type_combo)
+        signal_type_layout.addStretch()
+        top_info_layout.addWidget(signal_type_widget)
 
         # Settings display
         self.settings_label = QLabel()
@@ -158,6 +172,171 @@ class EcgTab(QWidget):
         peak = self.config.get("peak_method", "neurokit")
         quality = self.config.get("quality_method", "averageQRS")
         return f"{clean}-{peak}-{quality}"
+
+    def update_plot(self):
+        """Update the plot based on the selected signal type"""
+        if hasattr(self, 'ecg_glove') and self.ecg_glove:
+            self.plot_ecg_data()
+
+    def plot_ecg_data(self):
+        if not self.ecg_glove:
+            return
+
+        signal_type = self.signal_type_combo.currentText().lower()
+        self.figure.clear()
+
+        # Fixed lead order for 6x2 layout
+        lead_order = [
+            ("I", "V1"),
+            ("II", "V2"),
+            ("III", "V3"),
+            ("aVR", "V4"),
+            ("aVL", "V5"),
+            ("aVF", "V6"),
+        ]
+
+        # Get quality scores
+        quality_scores = getattr(self, 'quality_scores', {}).get('lead_quality', {})
+
+        # Create figure with 6 rows and 2 columns
+        self.axes = []
+        y_min = float("inf")
+        y_max = float("-inf")
+        signals_data = {}
+
+        # Pre-calculate signal data and find ranges
+        for row_leads in lead_order:
+            for lead in row_leads:
+                # Select signal based on type
+                if signal_type == "raw":
+                    signal = self.ecg_glove.raw_signals.get(lead, np.array([]))
+                elif signal_type == "filtered":
+                    signal = self.ecg_glove.lead_signals.get(lead, np.array([]))
+                else:  # cleaned
+                    signal = self.ecg_glove.cleaned_signals.get(lead, np.array([]))
+
+                if signal.size > 0:
+                    # Downsample for very large signals (> 10000 points)
+                    if signal.size > 10000:
+                        downsample_factor = signal.size // 10000 + 1
+                        signal = signal[::downsample_factor]
+
+                    times = np.arange(signal.size) / self.ecg_glove.sampling_rate
+                    y_min = min(y_min, np.min(signal))
+                    y_max = max(y_max, np.max(signal))
+                    signals_data[lead] = (times, signal)
+                else:
+                    signals_data[lead] = (np.array([]), np.array([]))
+
+        # Add margins to y-axis limits
+        y_range = y_max - y_min
+        y_min -= 0.1 * y_range
+        y_max += 0.1 * y_range
+
+        # Set up the figure for maximum space utilization
+        self.figure.subplots_adjust(
+            left=0.02, right=0.98, bottom=0.02, top=0.98, hspace=0.1, wspace=0.1
+        )
+
+        # Create subplots with minimal styling
+        first_ax = None
+        for row, (left_lead, right_lead) in enumerate(lead_order):
+            # Left plot
+            if first_ax is None:
+                ax_left = self.figure.add_subplot(6, 2, 2 * row + 1)
+                first_ax = ax_left
+            else:
+                ax_left = self.figure.add_subplot(
+                    6, 2, 2 * row + 1, sharex=first_ax, sharey=first_ax
+                )
+
+            # Right plot
+            ax_right = self.figure.add_subplot(
+                6, 2, 2 * row + 2, sharex=first_ax, sharey=first_ax
+            )
+
+            self.axes.extend([ax_left, ax_right])
+
+            # Configure axes for maximum signal visibility
+            for ax, lead in [(ax_left, left_lead), (ax_right, right_lead)]:
+                times, signal = signals_data[lead]
+                if signal.size > 0:
+                    ax.plot(
+                        times,
+                        signal,
+                        color=DEFAULT_SIGNAL_COLOR,
+                        linewidth=0.8,
+                        antialiased=True,
+                    )
+                    # Add lead label with quality information
+                    if lead in quality_scores:
+                        problems = []
+                        lead_quality = quality_scores[lead]
+                        quality_text = (
+                            f"{lead} ({lead_quality.get('nk_quality', 'N/A'):.2f})"
+                        )
+
+                        if lead_quality.get("Low_SNR"):
+                            color = "#ff6b6b"  # Red for poor quality
+                        elif lead_quality.get("Muscle_Artifact") or lead_quality.get(
+                            "Powerline_Interference"
+                        ):
+                            color = "#ffd93d"  # Yellow for moderate issues
+                        else:
+                            color = "#6bff6b"  # Green for good quality
+
+                        if lead_quality.get("Muscle_Artifact"):
+                            problems.append("MA")
+                        if lead_quality.get("Powerline_Interference"):
+                            problems.append("PI")
+                        if lead_quality.get("Baseline_Drift"):
+                            problems.append("BD")
+                        if lead_quality.get("Bad_Electrode_Contact"):
+                            problems.append("EC")
+
+                        if problems:
+                            quality_text += f" [{', '.join(problems)}]"
+
+                        ax.text(
+                            0.02,
+                            0.85,
+                            quality_text,
+                            transform=ax.transAxes,
+                            fontsize=8,
+                            color=color,
+                            alpha=0.8,
+                        )
+                    else:
+                        ax.text(
+                            0.02,
+                            0.85,
+                            lead,
+                            transform=ax.transAxes,
+                            fontsize=8,
+                            color="white",
+                            alpha=0.8,
+                        )
+
+                # Remove all unnecessary elements
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.grid(True, alpha=0.1, color=DEFAULT_GRID_COLOR)
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+
+        # Set limits for all plots
+        if first_ax:
+            first_ax.set_xlim(
+                0,
+                max(
+                    max(times[-1] for times, _ in signals_data.values() if times.size > 0),
+                    1,  # Fallback if no data
+                ),
+            )
+            first_ax.set_ylim(y_min, y_max)
+
+        # No need for tight_layout since we're using subplots_adjust
+        self.canvas.draw_idle()
 
 
 class EcgAnalyzerGUI(QMainWindow):
@@ -280,7 +459,17 @@ class EcgAnalyzerGUI(QMainWindow):
         clean_group = QGroupBox("ECG Cleaning Method")
         clean_layout = QVBoxLayout()
         self.clean_method = QComboBox()
-        self.clean_method.addItems(["neurokit", "biosppy", "pantompkins", "hamilton"])
+        self.clean_method.addItems(
+            [
+                "neurokit",
+                "biosppy",
+                "vg",
+                "engzeemod2012",
+                "elgendi2010",
+                "hamilton2002",
+                "pantompkins1985",
+            ]
+        )
         self.clean_method.setCurrentText("neurokit")
         clean_layout.addWidget(self.clean_method)
         clean_group.setLayout(clean_layout)
@@ -292,14 +481,12 @@ class EcgAnalyzerGUI(QMainWindow):
         self.peak_method.addItems(
             [
                 "neurokit",
-                "biosppy",
-                "gamboa",
                 "promac",
                 "emrich2023",
                 "rodrigues2021",
+                "nabian2018",
                 "kalidas2017",
                 "manikandan2012",
-                "nabian2018",
                 "engzeemod2012",
                 "elgendi2010",
                 "gamboa2008",
@@ -313,6 +500,20 @@ class EcgAnalyzerGUI(QMainWindow):
         self.peak_method.setCurrentText("neurokit")  # Default to neurokit
         peak_layout.addWidget(self.peak_method)
         peak_group.setLayout(peak_layout)
+
+        # Filter Selection
+        filter_group = QGroupBox("Filter Selection")
+        filter_layout = QVBoxLayout()
+        self.filter_40hz = QCheckBox("40 Hz")
+        self.filter_50hz = QCheckBox("50 Hz")
+        self.filter_60hz = QCheckBox("60 Hz")
+        self.filter_100hz = QCheckBox("100 Hz")
+        filter_layout.addWidget(self.filter_40hz)
+        filter_layout.addWidget(self.filter_50hz)
+        filter_layout.addWidget(self.filter_60hz)
+        filter_layout.addWidget(self.filter_100hz)
+        filter_group.setLayout(filter_layout)
+        nk_settings_layout.addWidget(filter_group)
 
         # Add all settings groups
         nk_settings_layout.addWidget(clean_group)
@@ -356,7 +557,7 @@ class EcgAnalyzerGUI(QMainWindow):
         if folder:
             self.file_list.clear()
             # list and sort by filename, display basename only
-            ret_files = sorted([f for f in os.listdir(folder) if f.endswith('.ret')])
+            ret_files = sorted([f for f in os.listdir(folder) if f.endswith(".ret")])
             for fname in ret_files:
                 item = QListWidgetItem(fname)
                 # store full path for later retrieval
@@ -417,32 +618,46 @@ class EcgAnalyzerGUI(QMainWindow):
             with open(self.current_file, "rb") as f:
                 data_bytes = f.read()
 
-            tab.ecg_glove = EcgGlove(sampling_rate=500)
-            tab.ecg_glove.decode_data(data_bytes)
-
             # Get selected methods from dropdowns
             clean_method = self.clean_method.currentText()
             peak_method = self.peak_method.currentText()
 
+            # Get filter selections
+            filters = []
+            if self.filter_40hz.isChecked():
+                filters.append(40)
+            if self.filter_50hz.isChecked():
+                filters.append(50)
+            if self.filter_60hz.isChecked():
+                filters.append(60)
+            if self.filter_100hz.isChecked():
+                filters.append(100)
+
+            tab.ecg_glove = EcgGlove(
+                sampling_rate=500,
+                clean_method=clean_method,
+                peak_method=peak_method,
+                filters=filters
+            )
+            tab.ecg_glove.decode_data(data_bytes)
+
             # Analyze quality first
-            quality_results = tab.ecg_glove.compute_quality(clean_method=clean_method)
+            quality_results = tab.ecg_glove.compute_quality()
 
             # Store quality scores and measurement results
             tab.quality_scores = quality_results
 
             # Analyze ECG if quality is acceptable
-            results = tab.ecg_glove.process(
-                clean_method=clean_method, peak_method=peak_method
-            )
+            results = tab.ecg_glove.process()
 
             # Format results for display
             # result_text = "Analysis Results:\n\n"
             result_text = f"Analysis Lead: {results['AnalysisLead']}\n\n"
 
             # Add measurements
-            if "measurements" in results:
+            if "ecgData" in results and "measurements" in results["ecgData"]:
                 result_text += "ECG Measurements:\n"
-                measurements = results["measurements"]
+                measurements = results["ecgData"]["measurements"]
                 if measurements.get("HeartRate_BPM"):
                     result_text += (
                         f"Heart Rate: {measurements['HeartRate_BPM']:.1f} BPM\n"
@@ -471,6 +686,15 @@ class EcgAnalyzerGUI(QMainWindow):
                     result_text += (
                         f"QTc Interval: {measurements['QTc_Interval_ms']:.0f} ms\n"
                     )
+
+                # Add axis measurements
+                result_text += "\nElectrical Axes:\n"
+                if measurements.get("P_Axis") is not None:
+                    result_text += f"P Wave: {measurements['P_Axis']:.0f}°\n"
+                if measurements.get("QRS_Axis") is not None:
+                    result_text += f"QRS Complex: {measurements['QRS_Axis']:.0f}°\n"
+                if measurements.get("T_Axis") is not None:
+                    result_text += f"T Wave: {measurements['T_Axis']:.0f}°\n"
 
             # Add overall quality results
             if "overall_quality" in quality_results:
