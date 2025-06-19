@@ -7,6 +7,16 @@ import matplotlib
 matplotlib.use("Agg")  # Use non-interactive backend
 from ecg_processor import EcgQualityProcessor
 from glove_decoder import ECGPacketDecoder
+from ecg_filters import (
+    MorphologyFilter,
+    NotchEcgFilter,
+    HiPassFilter,
+    HPFilterType,
+    MultiNotchFilter,
+    BaselineFilter,
+    SmoothingFilter,
+)
+
 
 T = TypeVar("T")
 
@@ -30,6 +40,12 @@ class EcgGlove:
         clean_method: str = DEFAULT_CLEAN_METHOD,
         peak_method: str = DEFAULT_PEAK_METHOD,
         filters: Optional[List[int]] = None,
+        spike_removal: bool = True,
+        hp_filter_type: HPFilterType = HPFilterType.HP015,
+        powerline_freq: int = 50,
+        enable_baseline_correction: bool = False,
+        enable_smoothing: bool = False,
+        smoothing_window: int = 5,
     ) -> None:
         """
         Initialize the ECG glove processor.
@@ -38,15 +54,45 @@ class EcgGlove:
             sampling_rate: Sampling rate of the ECG device (Hz). Default 500 Hz.
             clean_method: Method for cleaning ECG signals.
             peak_method: Method for R-peak detection.
-            filters: Optional list of notch filter frequencies (40, 50, 60, 100 Hz)
+            filters: Optional list of notch filter frequencies (50, 60, 100, 120 Hz)
+            spike_removal: Enable morphology-based spike removal filter.
+            hp_filter_type: Type of high-pass filter to use.
+            powerline_freq: Primary powerline frequency for notch filtering.
+            enable_baseline_correction: Enable baseline drift correction.
+            enable_smoothing: Enable signal smoothing.
+            smoothing_window: Window size for smoothing filter.
         """
         self.sampling_rate = sampling_rate
         self.filters = filters or []
-        self.raw_signals: Dict[str, NDArray[np.float64]] = (
-            {}
-        )  # Original decoded signals
-        self.lead_signals: Dict[str, NDArray[np.float64]] = {}  # Filtered signals
-        self.cleaned_signals: Dict[str, NDArray[np.float64]] = {}  # Cleaned signals
+        self.spike_removal = spike_removal
+        self.enable_baseline_correction = enable_baseline_correction
+        self.enable_smoothing = enable_smoothing
+
+        # Initialize filter components
+        self.hp_filter = HiPassFilter(hp_filter_type)
+
+        # Use MultiNotchFilter if multiple frequencies specified, otherwise single NotchEcgFilter
+        if len(self.filters) > 1:
+            # Filter valid notch frequencies
+            valid_notch_freqs = [f for f in self.filters if f in [50, 60, 100, 120]]
+            if valid_notch_freqs:
+                self.notch = MultiNotchFilter(valid_notch_freqs)
+            else:
+                self.notch = NotchEcgFilter(powerline_freq)
+        else:
+            self.notch = NotchEcgFilter(powerline_freq)
+
+        self.morph = MorphologyFilter()
+
+        # Optional filters
+        if enable_baseline_correction:
+            self.baseline_filter = BaselineFilter(sampling_rate=sampling_rate)
+
+        if enable_smoothing:
+            self.smoothing_filter = SmoothingFilter(window_size=smoothing_window)
+        self.raw_signals: Dict[str, NDArray[np.float64]] = {}
+        self.lead_signals: Dict[str, NDArray[np.float64]] = {}
+        self.cleaned_signals: Dict[str, NDArray[np.float64]] = {}
         self.ecg_data = {"raw_signals": {}, "lead_signals": {}, "cleaned_signals": {}}
         self.quality_scores: Dict[str, Dict[str, Any]] = {}
         self.quality_processor = EcgQualityProcessor(sampling_rate=sampling_rate)
@@ -93,25 +139,8 @@ class EcgGlove:
         self.lead_signals = {}
         for lead, signal_data in self.raw_signals.items():
             # First apply bandpass filter
-            filtered = nk.signal_filter(
-                signal_data,
-                sampling_rate=self.sampling_rate,
-                lowcut=self.clean_config["filter_params"]["lowcut"],
-                highcut=self.clean_config["filter_params"]["highcut"],
-                method="butterworth",
-            )
-
-            # Then apply notch filters for selected frequencies
-            if self.filters:
-                for freq in self.filters:
-                    filtered = nk.signal_filter(
-                        filtered,
-                        sampling_rate=self.sampling_rate,
-                        method="powerline",
-                        powerline=freq,
-                    )
-
-            self.lead_signals[lead] = np.array(filtered, dtype=np.float64)
+            filtered = self._filter_signal(signal_data)
+            self.lead_signals[lead] = filtered
 
         # Clean the filtered signals
         self.cleaned_signals = {
@@ -172,9 +201,7 @@ class EcgGlove:
 
         try:
             # Process waves and calculate measurements
-            ecg_data = self._process_waves(
-                {primary_lead_name: self.cleaned_signals[primary_lead_name]}
-            )
+            ecg_data = self._process_waves(primary_lead_name)
 
             return {
                 "AnalysisLead": primary_lead_name,
@@ -184,6 +211,32 @@ class EcgGlove:
 
         except Exception as err:
             raise RuntimeError(f"ECG analysis failed: {str(err)}") from err
+
+    def compute_quality(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Compute quality metrics for each ECG lead.
+        :return: Dictionary containing quality analysis results for all leads.
+        :raises RuntimeError: If no decoded lead signals are available.
+        """
+        if not self.lead_signals:
+            raise RuntimeError(
+                "No decoded lead signals available. Call decode_data first."
+            )
+
+        # Analyze all leads using the quality processor
+        results = self.quality_processor.analyze_all_leads(
+            {
+                "lead_signals": self.lead_signals,
+                "cleaned_signals": self.cleaned_signals,
+            }
+        )
+
+        # Store quality scores
+        self.quality_scores = {
+            lead: results["lead_quality"][lead] for lead in self.lead_signals.keys()
+        }
+
+        return cast(Dict[str, Dict[str, Any]], results)
 
     def save_leads_to_csv(self, filename: str) -> None:
         """
@@ -213,13 +266,45 @@ class EcgGlove:
             "V6": "Lead 8",
         }
 
-        #remove v1 - v4 and sort the columns
+        # remove v1 - v4 and sort the columns
         df = df[[col for col in column_mapping.keys() if col in df.columns]]
         df = df[list(column_mapping.keys())]  # Ensure correct order
         # Rename columns
         df = df.rename(columns=column_mapping)
         df.to_csv(filename + " py.csv", index=False)
         print(f"Lead signals saved to {filename}.csv")
+
+    def _filter_signal(self, raw: np.ndarray) -> np.ndarray:
+        """
+        Enhanced filtering pipeline with configurable components:
+          1) Baseline correction (optional)
+          2) Notch filtering (single or multiple frequencies)
+          3) High-pass filtering (morphology-based or IIR)
+          4) Smoothing (optional)
+        """
+        out = []
+        for x in raw.tolist():  # iterate sample‐by‐sample
+            y = x
+
+            # 1) Optional baseline correction
+            if self.enable_baseline_correction and hasattr(self, "baseline_filter"):
+                y = self.baseline_filter.get_new_val(y)
+
+            # 2) Notch filtering for power‐line interference
+            y = self.notch.get_new_val(y)
+
+            # 3) High-pass filtering
+            if self.spike_removal:
+                y = self.morph.compute_hpf(int(y))
+            else:
+                y = self.hp_filter.get_new_val(y)
+
+            # 4) Optional smoothing
+            if self.enable_smoothing and hasattr(self, "smoothing_filter"):
+                y = self.smoothing_filter.get_new_val(y)
+
+            out.append(y)
+        return np.array(out, dtype=np.float64)
 
     def _validate_signal_data(self) -> None:
         """
@@ -289,33 +374,7 @@ class EcgGlove:
         """
         return qt_interval * np.sqrt(1000 / rr_interval)
 
-    def compute_quality(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Compute quality metrics for each ECG lead.
-        :return: Dictionary containing quality analysis results for all leads.
-        :raises RuntimeError: If no decoded lead signals are available.
-        """
-        if not self.lead_signals:
-            raise RuntimeError(
-                "No decoded lead signals available. Call decode_data first."
-            )
-
-        # Analyze all leads using the quality processor
-        results = self.quality_processor.analyze_all_leads(
-            {
-                "lead_signals": self.lead_signals,
-                "cleaned_signals": self.cleaned_signals,
-            }
-        )
-
-        # Store quality scores
-        self.quality_scores = {
-            lead: results["lead_quality"][lead] for lead in self.lead_signals.keys()
-        }
-
-        return cast(Dict[str, Dict[str, Any]], results)
-
-    def _process_waves(self, cleaned) -> Dict[str, Any]:
+    def _process_waves(self, primaryLeadName) -> Dict[str, Any]:
         """
         A fully-customizable ECG processing pipeline.
 
@@ -328,19 +387,29 @@ class EcgGlove:
         """
         self._validate_signal_data()
 
+        # cleaned = self.cleaned_signals with I , III and primary lead
+        cleaned = {
+            lead: self.cleaned_signals[lead]
+            for lead in ["I", "III", primaryLeadName]
+            if lead in self.cleaned_signals
+        }
+
         # 1. Detect peaks and compute heart rate
         #    We'll store per-lead results, but often just lead II is enough.
         peak_results = {}
         for lead, sig in cleaned.items():
-            fn = self.peak_config.pop("function")
-            kwargs = {"sampling_rate": self.sampling_rate, **self.peak_config}
+            fn = self.peak_config["function"]  # Use get instead of pop
+            kwargs = {
+                "sampling_rate": self.sampling_rate,
+                **{k: v for k, v in self.peak_config.items() if k != "function"},
+            }
             signals, info = fn(sig, **kwargs)
             peak_results[lead] = (signals, info)
 
         # 2. Delineate waves
         waves_results = {}
         for lead, (signals, info) in peak_results.items():
-            fn = self.delineate_config.pop("function")
+            fn = self.delineate_config["function"]  # Use get instead of pop
             kwargs = {
                 "sampling_rate": self.sampling_rate,
                 "method": self.delineate_config.get("method", "dwt"),

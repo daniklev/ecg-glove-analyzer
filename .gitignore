@@ -3,6 +3,7 @@ Ecg12Data/
 ECG12_RET_PNG_PDF/
 /venv/
 /tools/
+/examples/
 
 # Python
 __pycache__/
@@ -11,6 +12,9 @@ __pycache__/
 *.so
 .Python
 .env
+
+data/*.csv
+
 
 # Distribution / packaging
 dist/
@@ -26,6 +30,7 @@ build/
 # Testing
 .coverage
 htmlcov/
+/tests/
 .pytest_cache/
 
 # Logs and databases
