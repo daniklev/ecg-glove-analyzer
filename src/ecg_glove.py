@@ -2,7 +2,6 @@ from typing import Dict, TypeVar, Any, cast, Optional, List
 from numpy.typing import NDArray
 import numpy as np
 import neurokit2 as nk
-from scipy import signal
 import matplotlib
 
 matplotlib.use("Agg")  # Use non-interactive backend
@@ -185,6 +184,42 @@ class EcgGlove:
 
         except Exception as err:
             raise RuntimeError(f"ECG analysis failed: {str(err)}") from err
+
+    def save_leads_to_csv(self, filename: str) -> None:
+        """
+        Save the decoded lead signals to a CSV file.
+
+        Args:
+            filename: Name of the file to save the lead signals.
+        """
+        if not self.lead_signals:
+            raise RuntimeError(
+                "No decoded lead signals available. Call decode_data first."
+            )
+
+        # Convert lead signals to a DataFrame
+        import pandas as pd
+
+        df = pd.DataFrame(self.raw_signals)
+        # Rename columns to required format
+        column_mapping = {
+            "I": "Lead 1",
+            "III": "Lead 2",
+            "V1": "Lead 3",
+            "V2": "Lead 4",
+            "V3": "Lead 5",
+            "V4": "Lead 6",
+            "V5": "Lead 7",
+            "V6": "Lead 8",
+        }
+
+        #remove v1 - v4 and sort the columns
+        df = df[[col for col in column_mapping.keys() if col in df.columns]]
+        df = df[list(column_mapping.keys())]  # Ensure correct order
+        # Rename columns
+        df = df.rename(columns=column_mapping)
+        df.to_csv(filename + " py.csv", index=False)
+        print(f"Lead signals saved to {filename}.csv")
 
     def _validate_signal_data(self) -> None:
         """
@@ -523,11 +558,14 @@ if __name__ == "__main__":
     # Example usage
     ecg_glove = EcgGlove()
 
+    filepath = "data/220209015248248"
     # load byte data from a file or other source
-    with open("data/20256912588244379.ret", "rb") as f:
+    with open(filepath + ".ret", "rb") as f:
         data_bytes = f.read()
     try:
         ecg_glove.decode_data(data_bytes)
+        # save the decoded leads to csv file
+        ecg_glove.save_leads_to_csv(filepath)
         results = ecg_glove.process()
         print("ECG Analysis Results:", results)
     except Exception as e:
