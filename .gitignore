@@ -3,7 +3,6 @@ Ecg12Data/
 ECG12_RET_PNG_PDF/
 /venv/
 /tools/
-/CommwellEcgCalculation/
 
 # Python
 __pycache__/

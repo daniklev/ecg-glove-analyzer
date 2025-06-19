@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Commwell.Ecg.Calculation</id>
+    <version>1.0.2</version>
+    <authors>Irving Levi</authors>
+    <description>Package Description</description>
+    <repository type="git" commit="8b7864d2f89f91605db5af3f34f22e9b8df9130c" />
+    <dependencies>
+      <group targetFramework="net8.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation.runtimeconfig.json" target="lib/net8.0/CommwellEcgCalculation.runtimeconfig.json" />
+    <file src="/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation.dll" target="lib/net8.0/CommwellEcgCalculation.dll" />
+  </files>
+</package>

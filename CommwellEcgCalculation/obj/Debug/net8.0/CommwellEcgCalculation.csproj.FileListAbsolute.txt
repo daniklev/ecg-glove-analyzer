@@ -1,0 +1,15 @@
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation.deps.json
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation.runtimeconfig.json
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation.dll
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/bin/Debug/net8.0/CommwellEcgCalculation.pdb
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.GeneratedMSBuildEditorConfig.editorconfig
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.AssemblyInfoInputs.cache
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.AssemblyInfo.cs
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.csproj.CoreCompileInputs.cache
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.sourcelink.json
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.dll
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/refint/CommwellEcgCalculation.dll
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.pdb
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/CommwellEcgCalculation.genruntimeconfig.cache
+/Users/danik/Developer/ecg-glove-analyzer/CommwellEcgCalculation/obj/Debug/net8.0/ref/CommwellEcgCalculation.dll
