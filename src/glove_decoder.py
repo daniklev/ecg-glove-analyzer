@@ -1,180 +1,108 @@
-"""ECG Glove data decoder.
-
-This module provides functionality to decode binary data from the ECG glove device.
-It handles packet framing, checksum verification, and extraction of ECG channel data.
-"""
-
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 import numpy as np
 from numpy.typing import NDArray
 
 
-@dataclass
-class GlovePacket:
-    """Represents a decoded glove data packet."""
-
-    packet_type: int
-    payload: bytes
-    checksum_valid: bool
-
-
 class ECGPacketDecoder:
-    """Decoder for ECG glove data packets."""
+    PC_ADDR = 0x80  # Destination = PC
+    UNIT_ADDR = 0x17  # Source = ECG unit
+    TYPE_DATA = 0x00  # Transfer type = Data
+    DATA_SUBTYPE = 0x51  # header[5] == 0x51 ⇒ 81-byte ECG payload
+    HEADER_LEN = 7  # bytes in the header
 
-    # Packet constants
-    SYNC_BYTE = 0x80
-    HEADER_SIZE = 7
-    ECG_PACKET_TYPE = 0x51
-    FAULT_PACKET_TYPE = 0x03
-    ECG_PAYLOAD_SIZE = 81  # 80 bytes data + 1 byte checksum
-    FAULT_PAYLOAD_SIZE = 10
+    def __init__(self):
+        # 8 channels: 0→Lead I, 1→Lead III, …, 7→Lead V6
+        self.leads: Dict[int, List[int]] = {ch: [] for ch in range(8)}
 
-    def __init__(self) -> None:
-        """Initialize the decoder."""
-        self.buffer = bytearray()
-        self.channels: Dict[int, List[int]] = {i: [] for i in range(8)}
+    def reset(self):
+        """Clear out any previously-decoded samples."""
+        self.leads: Dict[int, List[int]] = {ch: [] for ch in range(8)}
 
-    def _verify_checksum(self, data: bytes) -> bool:
-        """Verify packet checksum (sum of all bytes should be 0 mod 256)."""
-        return sum(data) & 0xFF == 0
+    def decode(self, buf: bytes) -> Dict[str, NDArray[np.float64]]:
+        """Decode ECG data and return lead signals."""
+        self.reset()  # Clear previous data
+        self.feed(buf)  # Process the data
+        return self.get_leads()  # Return the processed leads
 
-    def _decode_header(self, header: bytes) -> Optional[int]:
-        """Decode packet header and return packet type if valid."""
-        if (
-            len(header) == self.HEADER_SIZE
-            and header[0] == self.SYNC_BYTE
-            and header[1] == 0x17
-            and header[2] == 0x00
-            and self._verify_checksum(header)
-        ):
-            return header[5]  # Packet type
-        return None
-
-    def _decode_ecg_frame(self, frame: bytes) -> None:
-        """Decode a single ECG frame (16 bytes) containing 8 channels."""
-        for ch in range(8):
-            # Get LSB and MSB
-            lsb = frame[2 * ch]
-            msb = frame[2 * ch + 1]
-            # Combine bytes to form 16-bit value
-            value = (msb << 8) | (lsb & 0xFF)
-            # Convert to signed 16-bit
-            if value > 32767:
-                value -= 65536
-            self.channels[ch].append(value)
-
-    def _decode_ecg_packet(self, payload: bytes) -> bool:
-        """Decode ECG data packet payload."""
-        if not self._verify_checksum(payload):
-            return False
-
-        # Process 5 frames of 8 channels (16 bytes per frame)
-        data = payload[:-1]  # Skip checksum byte
-        for frame_start in range(0, len(data), 16):
-            frame = data[frame_start : frame_start + 16]
-            if len(frame) == 16:  # Ensure complete frame
-                self._decode_ecg_frame(frame)
-        return True
-
-    def _find_next_packet(
-        self, data: bytes, start: int = 0
-    ) -> Tuple[int, Optional[GlovePacket]]:
-        """Find and decode the next packet in the data stream."""
-        size = len(data)
-        i = start
+    def feed(self, buf: bytes):
+        size = len(buf)
+        i = 0
+        packetType = 0
 
         while i < size:
-            # Look for sync byte
-            if data[i] != self.SYNC_BYTE:
+            # 1) Frame-sync: find 0x80 (PC_ADDR)
+            while i < size and buf[i] != self.PC_ADDR:
                 i += 1
-                continue
+                if i > size - 11:  # fewer than 11 bytes left ⇒ stop
+                    return
+            if i > size - 11:
+                return
 
-            # Check if we have enough bytes for a header
-            if i + self.HEADER_SIZE > size:
-                break
+            # 2) If this looks like a data header, verify its checksum
+            if buf[i + 1] == self.UNIT_ADDR and buf[i + 2] == self.TYPE_DATA:
+                hdr_sum = sum(buf[i + k] for k in range(self.HEADER_LEN)) & 0xFF
+                if hdr_sum == 0:
+                    packetType = buf[i + 5]
+                else:
+                    packetType = 0
+            # else: packetType stays whatever it was
 
-            # Try to decode header
-            header = data[i : i + self.HEADER_SIZE]
-            packet_type = self._decode_header(header)
-            if packet_type is None:
+            # 3) Dispatch on packetType
+            if packetType == self.DATA_SUBTYPE:
+                # move past header
+                start = i + self.HEADER_LEN
+
+                # only decode if the full payload+cs fits
+                if start + packetType < size:
+                    block = buf[start : start + packetType]
+                    # block includes (data + 1-byte checksum)
+                    if sum(block) & 0xFF == 0:
+                        data_len = packetType - 1  # drop the final cs byte
+                        # must be whole 16-byte groups (8 leads×2 bytes)
+                        if data_len % 16 == 0:
+                            # decode exactly like computeLead does
+                            for base in range(start, start + data_len, 16):
+                                for ch in range(8):
+                                    lo = buf[base + ch * 2]
+                                    hi = buf[base + ch * 2 + 1]
+                                    val = (hi << 8) | lo
+                                    # two's-complement fix
+                                    if val & 0x8000:
+                                        val -= 0x10000
+                                    self.leads[ch].append(val)
+
+                # advance past header + entire payload
+                i += self.HEADER_LEN + packetType
+
+            elif packetType == 3:
+                # fault packet
                 i += 1
-                continue
 
-            # Handle different packet types
-            payload_size = 0
-            if packet_type == self.ECG_PACKET_TYPE:
-                payload_size = self.ECG_PAYLOAD_SIZE
-            elif packet_type == self.FAULT_PACKET_TYPE:
-                payload_size = self.FAULT_PAYLOAD_SIZE
+            else:
+                # any other packetType ⇒ skip one byte
+                i += 1
 
-            # Check if we have complete packet
-            packet_end = i + self.HEADER_SIZE + payload_size
-            if packet_end > size:
-                break
-
-            # Extract and verify payload
-            payload = data[i + self.HEADER_SIZE : packet_end]
-            checksum_valid = self._verify_checksum(payload)
-
-            return packet_end, GlovePacket(
-                packet_type=packet_type, payload=payload, checksum_valid=checksum_valid
-            )
-
-            i = packet_end
-
-        return i, None
-
-    def decode(self, data: bytes) -> Dict[str, NDArray[np.float64]]:
-        """Decode ECG data from bytes and return channel data.
-
-        Args:
-            data: Raw bytes from the ECG glove device
-
-        Returns:
-            Dictionary mapping lead names to numpy arrays of signal values
-
-        Raises:
-            ValueError: If no valid ECG data is found
-        """
-        # Reset channel buffers
-        self.channels = {i: [] for i in range(8)}
-
-        # Process all packets
-        pos = 0
-        while pos < len(data):
-            next_pos, packet = self._find_next_packet(data, pos)
-            if packet is None:
-                break
-
-            if packet.packet_type == self.ECG_PACKET_TYPE and packet.checksum_valid:
-                self._decode_ecg_packet(packet.payload)
-
-            pos = next_pos
-
-        # Convert channel lists to numpy arrays
-        if not any(self.channels.values()):
-            raise ValueError("No valid ECG data found in input")
-
-        # Map channels to lead names and convert to numpy arrays
-        leads = {
-            "I": np.array(self.channels[0], dtype=np.float64),
-            "II": np.array(self.channels[1], dtype=np.float64),
-            "V1": np.array(self.channels[2], dtype=np.float64),
-            "V2": np.array(self.channels[3], dtype=np.float64),
-            "V3": np.array(self.channels[4], dtype=np.float64),
-            "V4": np.array(self.channels[5], dtype=np.float64),
-            "V5": np.array(self.channels[6], dtype=np.float64),
-            "V6": np.array(self.channels[7], dtype=np.float64),
+    def get_leads(self) -> Dict[str, NDArray[np.float64]]:
+        """Convert raw channel data to standard ECG leads."""
+        # — map raw channels → leads, truncate to shortest —
+        raw = {
+            "I": np.array(self.leads[0], dtype=float),
+            "III": np.array(self.leads[1], dtype=float),
+            "V1": np.array(self.leads[2], dtype=float),
+            "V2": np.array(self.leads[3], dtype=float),
+            "V3": np.array(self.leads[4], dtype=float),
+            "V4": np.array(self.leads[5], dtype=float),
+            "V5": np.array(self.leads[6], dtype=float),
+            "V6": np.array(self.leads[7], dtype=float),
         }
+        min_len = min(len(arr) for arr in raw.values()) if raw["I"].size > 0 else 0
+        for lead in raw:
+            raw[lead] = raw[lead][:min_len]
 
-        # Ensure all leads have the same length
-        min_length = min(len(arr) for arr in leads.values())
-        leads = {name: arr[:min_length] for name, arr in leads.items()}
-
-        # Calculate derived leads
-        if len(leads["I"]) > 0 and len(leads["II"]) > 0:
-            leads["III"] = leads["II"] - leads["I"]
+        # — derive remaining standard leads —
+        leads = dict(raw)
+        if min_len > 0:
+            leads["II"] = leads["I"] + leads["III"]
             leads["aVR"] = -(leads["I"] + leads["II"]) / 2
             leads["aVL"] = leads["I"] - leads["II"] / 2
             leads["aVF"] = leads["II"] - leads["I"] / 2

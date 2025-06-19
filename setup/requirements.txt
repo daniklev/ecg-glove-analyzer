@@ -3,3 +3,4 @@ PyWavelets>=1.4.1
 neurokit2==0.2.11
 matplotlib>=3.7.0
 PyQt5>=5.15.0
+ts2vg>=0.1.0

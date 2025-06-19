@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<!-- saved from url=(0086)https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html -->
+<html lang="en" data-content_root="../../" data-mode="auto" data-theme="dark" class="fontawesome-i2svg-active fontawesome-i2svg-complete"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <style type="text/css">:host,:root{--fa-font-solid:normal 900 1em/1 "Font Awesome 6 Solid";--fa-font-regular:normal 400 1em/1 "Font Awesome 6 Regular";--fa-font-light:normal 300 1em/1 "Font Awesome 6 Light";--fa-font-thin:normal 100 1em/1 "Font Awesome 6 Thin";--fa-font-duotone:normal 900 1em/1 "Font Awesome 6 Duotone";--fa-font-sharp-solid:normal 900 1em/1 "Font Awesome 6 Sharp";--fa-font-sharp-regular:normal 400 1em/1 "Font Awesome 6 Sharp";--fa-font-sharp-light:normal 300 1em/1 "Font Awesome 6 Sharp";--fa-font-sharp-thin:normal 100 1em/1 "Font Awesome 6 Sharp";--fa-font-brands:normal 400 1em/1 "Font Awesome 6 Brands"}svg:not(:host).svg-inline--fa,svg:not(:root).svg-inline--fa{overflow:visible;box-sizing:content-box}.svg-inline--fa{display:var(--fa-display,inline-block);height:1em;overflow:visible;vertical-align:-.125em}.svg-inline--fa.fa-2xs{vertical-align:.1em}.svg-inline--fa.fa-xs{vertical-align:0}.svg-inline--fa.fa-sm{vertical-align:-.0714285705em}.svg-inline--fa.fa-lg{vertical-align:-.2em}.svg-inline--fa.fa-xl{vertical-align:-.25em}.svg-inline--fa.fa-2xl{vertical-align:-.3125em}.svg-inline--fa.fa-pull-left{margin-right:var(--fa-pull-margin,.3em);width:auto}.svg-inline--fa.fa-pull-right{margin-left:var(--fa-pull-margin,.3em);width:auto}.svg-inline--fa.fa-li{width:var(--fa-li-width,2em);top:.25em}.svg-inline--fa.fa-fw{width:var(--fa-fw-width,1.25em)}.fa-layers svg.svg-inline--fa{bottom:0;left:0;margin:auto;position:absolute;right:0;top:0}.fa-layers-counter,.fa-layers-text{display:inline-block;position:absolute;text-align:center}.fa-layers{display:inline-block;height:1em;position:relative;text-align:center;vertical-align:-.125em;width:1em}.fa-layers svg.svg-inline--fa{-webkit-transform-origin:center center;transform-origin:center center}.fa-layers-text{left:50%;top:50%;-webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%);-webkit-transform-origin:center center;transform-origin:center center}.fa-layers-counter{background-color:var(--fa-counter-background-color,#ff253a);border-radius:var(--fa-counter-border-radius,1em);box-sizing:border-box;color:var(--fa-inverse,#fff);line-height:var(--fa-counter-line-height,1);max-width:var(--fa-counter-max-width,5em);min-width:var(--fa-counter-min-width,1.5em);overflow:hidden;padding:var(--fa-counter-padding,.25em .5em);right:var(--fa-right,0);text-overflow:ellipsis;top:var(--fa-top,0);-webkit-transform:scale(var(--fa-counter-scale,.25));transform:scale(var(--fa-counter-scale,.25));-webkit-transform-origin:top right;transform-origin:top right}.fa-layers-bottom-right{bottom:var(--fa-bottom,0);right:var(--fa-right,0);top:auto;-webkit-transform:scale(var(--fa-layers-scale,.25));transform:scale(var(--fa-layers-scale,.25));-webkit-transform-origin:bottom right;transform-origin:bottom right}.fa-layers-bottom-left{bottom:var(--fa-bottom,0);left:var(--fa-left,0);right:auto;top:auto;-webkit-transform:scale(var(--fa-layers-scale,.25));transform:scale(var(--fa-layers-scale,.25));-webkit-transform-origin:bottom left;transform-origin:bottom left}.fa-layers-top-right{top:var(--fa-top,0);right:var(--fa-right,0);-webkit-transform:scale(var(--fa-layers-scale,.25));transform:scale(var(--fa-layers-scale,.25));-webkit-transform-origin:top right;transform-origin:top right}.fa-layers-top-left{left:var(--fa-left,0);right:auto;top:var(--fa-top,0);-webkit-transform:scale(var(--fa-layers-scale,.25));transform:scale(var(--fa-layers-scale,.25));-webkit-transform-origin:top left;transform-origin:top left}.fa-1x{font-size:1em}.fa-2x{font-size:2em}.fa-3x{font-size:3em}.fa-4x{font-size:4em}.fa-5x{font-size:5em}.fa-6x{font-size:6em}.fa-7x{font-size:7em}.fa-8x{font-size:8em}.fa-9x{font-size:9em}.fa-10x{font-size:10em}.fa-2xs{font-size:.625em;line-height:.1em;vertical-align:.225em}.fa-xs{font-size:.75em;line-height:.0833333337em;vertical-align:.125em}.fa-sm{font-size:.875em;line-height:.0714285718em;vertical-align:.0535714295em}.fa-lg{font-size:1.25em;line-height:.05em;vertical-align:-.075em}.fa-xl{font-size:1.5em;line-height:.0416666682em;vertical-align:-.125em}.fa-2xl{font-size:2em;line-height:.03125em;vertical-align:-.1875em}.fa-fw{text-align:center;width:1.25em}.fa-ul{list-style-type:none;margin-left:var(--fa-li-margin,2.5em);padding-left:0}.fa-ul>li{position:relative}.fa-li{left:calc(var(--fa-li-width,2em) * -1);position:absolute;text-align:center;width:var(--fa-li-width,2em);line-height:inherit}.fa-border{border-color:var(--fa-border-color,#eee);border-radius:var(--fa-border-radius,.1em);border-style:var(--fa-border-style,solid);border-width:var(--fa-border-width,.08em);padding:var(--fa-border-padding,.2em .25em .15em)}.fa-pull-left{float:left;margin-right:var(--fa-pull-margin,.3em)}.fa-pull-right{float:right;margin-left:var(--fa-pull-margin,.3em)}.fa-beat{-webkit-animation-name:fa-beat;animation-name:fa-beat;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,ease-in-out);animation-timing-function:var(--fa-animation-timing,ease-in-out)}.fa-bounce{-webkit-animation-name:fa-bounce;animation-name:fa-bounce;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,cubic-bezier(.28,.84,.42,1));animation-timing-function:var(--fa-animation-timing,cubic-bezier(.28,.84,.42,1))}.fa-fade{-webkit-animation-name:fa-fade;animation-name:fa-fade;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,cubic-bezier(.4,0,.6,1));animation-timing-function:var(--fa-animation-timing,cubic-bezier(.4,0,.6,1))}.fa-beat-fade{-webkit-animation-name:fa-beat-fade;animation-name:fa-beat-fade;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,cubic-bezier(.4,0,.6,1));animation-timing-function:var(--fa-animation-timing,cubic-bezier(.4,0,.6,1))}.fa-flip{-webkit-animation-name:fa-flip;animation-name:fa-flip;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,ease-in-out);animation-timing-function:var(--fa-animation-timing,ease-in-out)}.fa-shake{-webkit-animation-name:fa-shake;animation-name:fa-shake;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,linear);animation-timing-function:var(--fa-animation-timing,linear)}.fa-spin{-webkit-animation-name:fa-spin;animation-name:fa-spin;-webkit-animation-delay:var(--fa-animation-delay,0s);animation-delay:var(--fa-animation-delay,0s);-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,2s);animation-duration:var(--fa-animation-duration,2s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,linear);animation-timing-function:var(--fa-animation-timing,linear)}.fa-spin-reverse{--fa-animation-direction:reverse}.fa-pulse,.fa-spin-pulse{-webkit-animation-name:fa-spin;animation-name:fa-spin;-webkit-animation-direction:var(--fa-animation-direction,normal);animation-direction:var(--fa-animation-direction,normal);-webkit-animation-duration:var(--fa-animation-duration,1s);animation-duration:var(--fa-animation-duration,1s);-webkit-animation-iteration-count:var(--fa-animation-iteration-count,infinite);animation-iteration-count:var(--fa-animation-iteration-count,infinite);-webkit-animation-timing-function:var(--fa-animation-timing,steps(8));animation-timing-function:var(--fa-animation-timing,steps(8))}@media (prefers-reduced-motion:reduce){.fa-beat,.fa-beat-fade,.fa-bounce,.fa-fade,.fa-flip,.fa-pulse,.fa-shake,.fa-spin,.fa-spin-pulse{-webkit-animation-delay:-1ms;animation-delay:-1ms;-webkit-animation-duration:1ms;animation-duration:1ms;-webkit-animation-iteration-count:1;animation-iteration-count:1;-webkit-transition-delay:0s;transition-delay:0s;-webkit-transition-duration:0s;transition-duration:0s}}@-webkit-keyframes fa-beat{0%,90%{-webkit-transform:scale(1);transform:scale(1)}45%{-webkit-transform:scale(var(--fa-beat-scale,1.25));transform:scale(var(--fa-beat-scale,1.25))}}@keyframes fa-beat{0%,90%{-webkit-transform:scale(1);transform:scale(1)}45%{-webkit-transform:scale(var(--fa-beat-scale,1.25));transform:scale(var(--fa-beat-scale,1.25))}}@-webkit-keyframes fa-bounce{0%{-webkit-transform:scale(1,1) translateY(0);transform:scale(1,1) translateY(0)}10%{-webkit-transform:scale(var(--fa-bounce-start-scale-x,1.1),var(--fa-bounce-start-scale-y,.9)) translateY(0);transform:scale(var(--fa-bounce-start-scale-x,1.1),var(--fa-bounce-start-scale-y,.9)) translateY(0)}30%{-webkit-transform:scale(var(--fa-bounce-jump-scale-x,.9),var(--fa-bounce-jump-scale-y,1.1)) translateY(var(--fa-bounce-height,-.5em));transform:scale(var(--fa-bounce-jump-scale-x,.9),var(--fa-bounce-jump-scale-y,1.1)) translateY(var(--fa-bounce-height,-.5em))}50%{-webkit-transform:scale(var(--fa-bounce-land-scale-x,1.05),var(--fa-bounce-land-scale-y,.95)) translateY(0);transform:scale(var(--fa-bounce-land-scale-x,1.05),var(--fa-bounce-land-scale-y,.95)) translateY(0)}57%{-webkit-transform:scale(1,1) translateY(var(--fa-bounce-rebound,-.125em));transform:scale(1,1) translateY(var(--fa-bounce-rebound,-.125em))}64%{-webkit-transform:scale(1,1) translateY(0);transform:scale(1,1) translateY(0)}100%{-webkit-transform:scale(1,1) translateY(0);transform:scale(1,1) translateY(0)}}@keyframes fa-bounce{0%{-webkit-transform:scale(1,1) translateY(0);transform:scale(1,1) translateY(0)}10%{-webkit-transform:scale(var(--fa-bounce-start-scale-x,1.1),var(--fa-bounce-start-scale-y,.9)) translateY(0);transform:scale(var(--fa-bounce-start-scale-x,1.1),var(--fa-bounce-start-scale-y,.9)) translateY(0)}30%{-webkit-transform:scale(var(--fa-bounce-jump-scale-x,.9),var(--fa-bounce-jump-scale-y,1.1)) translateY(var(--fa-bounce-height,-.5em));transform:scale(var(--fa-bounce-jump-scale-x,.9),var(--fa-bounce-jump-scale-y,1.1)) translateY(var(--fa-bounce-height,-.5em))}50%{-webkit-transform:scale(var(--fa-bounce-land-scale-x,1.05),var(--fa-bounce-land-scale-y,.95)) translateY(0);transform:scale(var(--fa-bounce-land-scale-x,1.05),var(--fa-bounce-land-scale-y,.95)) translateY(0)}57%{-webkit-transform:scale(1,1) translateY(var(--fa-bounce-rebound,-.125em));transform:scale(1,1) translateY(var(--fa-bounce-rebound,-.125em))}64%{-webkit-transform:scale(1,1) translateY(0);transform:scale(1,1) translateY(0)}100%{-webkit-transform:scale(1,1) translateY(0);transform:scale(1,1) translateY(0)}}@-webkit-keyframes fa-fade{50%{opacity:var(--fa-fade-opacity,.4)}}@keyframes fa-fade{50%{opacity:var(--fa-fade-opacity,.4)}}@-webkit-keyframes fa-beat-fade{0%,100%{opacity:var(--fa-beat-fade-opacity,.4);-webkit-transform:scale(1);transform:scale(1)}50%{opacity:1;-webkit-transform:scale(var(--fa-beat-fade-scale,1.125));transform:scale(var(--fa-beat-fade-scale,1.125))}}@keyframes fa-beat-fade{0%,100%{opacity:var(--fa-beat-fade-opacity,.4);-webkit-transform:scale(1);transform:scale(1)}50%{opacity:1;-webkit-transform:scale(var(--fa-beat-fade-scale,1.125));transform:scale(var(--fa-beat-fade-scale,1.125))}}@-webkit-keyframes fa-flip{50%{-webkit-transform:rotate3d(var(--fa-flip-x,0),var(--fa-flip-y,1),var(--fa-flip-z,0),var(--fa-flip-angle,-180deg));transform:rotate3d(var(--fa-flip-x,0),var(--fa-flip-y,1),var(--fa-flip-z,0),var(--fa-flip-angle,-180deg))}}@keyframes fa-flip{50%{-webkit-transform:rotate3d(var(--fa-flip-x,0),var(--fa-flip-y,1),var(--fa-flip-z,0),var(--fa-flip-angle,-180deg));transform:rotate3d(var(--fa-flip-x,0),var(--fa-flip-y,1),var(--fa-flip-z,0),var(--fa-flip-angle,-180deg))}}@-webkit-keyframes fa-shake{0%{-webkit-transform:rotate(-15deg);transform:rotate(-15deg)}4%{-webkit-transform:rotate(15deg);transform:rotate(15deg)}24%,8%{-webkit-transform:rotate(-18deg);transform:rotate(-18deg)}12%,28%{-webkit-transform:rotate(18deg);transform:rotate(18deg)}16%{-webkit-transform:rotate(-22deg);transform:rotate(-22deg)}20%{-webkit-transform:rotate(22deg);transform:rotate(22deg)}32%{-webkit-transform:rotate(-12deg);transform:rotate(-12deg)}36%{-webkit-transform:rotate(12deg);transform:rotate(12deg)}100%,40%{-webkit-transform:rotate(0);transform:rotate(0)}}@keyframes fa-shake{0%{-webkit-transform:rotate(-15deg);transform:rotate(-15deg)}4%{-webkit-transform:rotate(15deg);transform:rotate(15deg)}24%,8%{-webkit-transform:rotate(-18deg);transform:rotate(-18deg)}12%,28%{-webkit-transform:rotate(18deg);transform:rotate(18deg)}16%{-webkit-transform:rotate(-22deg);transform:rotate(-22deg)}20%{-webkit-transform:rotate(22deg);transform:rotate(22deg)}32%{-webkit-transform:rotate(-12deg);transform:rotate(-12deg)}36%{-webkit-transform:rotate(12deg);transform:rotate(12deg)}100%,40%{-webkit-transform:rotate(0);transform:rotate(0)}}@-webkit-keyframes fa-spin{0%{-webkit-transform:rotate(0);transform:rotate(0)}100%{-webkit-transform:rotate(360deg);transform:rotate(360deg)}}@keyframes fa-spin{0%{-webkit-transform:rotate(0);transform:rotate(0)}100%{-webkit-transform:rotate(360deg);transform:rotate(360deg)}}.fa-rotate-90{-webkit-transform:rotate(90deg);transform:rotate(90deg)}.fa-rotate-180{-webkit-transform:rotate(180deg);transform:rotate(180deg)}.fa-rotate-270{-webkit-transform:rotate(270deg);transform:rotate(270deg)}.fa-flip-horizontal{-webkit-transform:scale(-1,1);transform:scale(-1,1)}.fa-flip-vertical{-webkit-transform:scale(1,-1);transform:scale(1,-1)}.fa-flip-both,.fa-flip-horizontal.fa-flip-vertical{-webkit-transform:scale(-1,-1);transform:scale(-1,-1)}.fa-rotate-by{-webkit-transform:rotate(var(--fa-rotate-angle,0));transform:rotate(var(--fa-rotate-angle,0))}.fa-stack{display:inline-block;vertical-align:middle;height:2em;position:relative;width:2.5em}.fa-stack-1x,.fa-stack-2x{bottom:0;left:0;margin:auto;position:absolute;right:0;top:0;z-index:var(--fa-stack-z-index,auto)}.svg-inline--fa.fa-stack-1x{height:1em;width:1.25em}.svg-inline--fa.fa-stack-2x{height:2em;width:2.5em}.fa-inverse{color:var(--fa-inverse,#fff)}.fa-sr-only,.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0}.fa-sr-only-focusable:not(:focus),.sr-only-focusable:not(:focus){position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0}.svg-inline--fa .fa-primary{fill:var(--fa-primary-color,currentColor);opacity:var(--fa-primary-opacity,1)}.svg-inline--fa .fa-secondary{fill:var(--fa-secondary-color,currentColor);opacity:var(--fa-secondary-opacity,.4)}.svg-inline--fa.fa-swap-opacity .fa-primary{opacity:var(--fa-secondary-opacity,.4)}.svg-inline--fa.fa-swap-opacity .fa-secondary{opacity:var(--fa-primary-opacity,1)}.svg-inline--fa mask .fa-primary,.svg-inline--fa mask .fa-secondary{fill:#000}.fa-duotone.fa-inverse,.fad.fa-inverse{color:var(--fa-inverse,#fff)}</style><link href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/theme.css" rel="stylesheet">
+<link href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/bootstrap.css" rel="stylesheet">
+<link href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/pydata-sphinx-theme.css" rel="stylesheet">
+
+  
+  <link href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/all.min.css" rel="stylesheet">
+  <link rel="preload" as="font" type="font/woff2" crossorigin="" href="https://neuropsychology.github.io/NeuroKit/_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin="" href="https://neuropsychology.github.io/NeuroKit/_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin="" href="https://neuropsychology.github.io/NeuroKit/_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/pygments.css">
+    <link rel="stylesheet" type="text/css" href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/sphinx-book-theme.css">
+    <link rel="stylesheet" type="text/css" href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/copybutton.css">
+    <link rel="stylesheet" type="text/css" href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css">
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/bootstrap.js">
+<link rel="preload" as="script" href="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/pydata-sphinx-theme.js">
+  <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/all.min.js"></script>
+
+    <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/documentation_options.js"></script>
+    <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/doctools.js"></script>
+    <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/sphinx_highlight.js"></script>
+    <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/clipboard.min.js"></script>
+    <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/copybutton.js"></script>
+    <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/sphinx-book-theme.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'examples/ecg_heartbeats/ecg_heartbeats';</script>
+    <link rel="icon" href="https://neuropsychology.github.io/NeuroKit/_static/icon.ico">
+    <link rel="index" title="Index" href="https://neuropsychology.github.io/NeuroKit/genindex.html">
+    <link rel="search" title="Search" href="https://neuropsychology.github.io/NeuroKit/search.html">
+    <link rel="next" title="Locate P, Q, S and T waves in ECG" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_delineate/ecg_delineate.html">
+    <link rel="prev" title="Heart Rate Variability (HRV)" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_hrv/ecg_hrv.html">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="docsearch:language" content="en">
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="" class="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top" style="display: none;">
+    <svg class="svg-inline--fa fa-arrow-up" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="arrow-up" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" data-fa-i2svg=""><path fill="currentColor" d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg><!-- <i class="fa-solid fa-arrow-up"></i> Font Awesome fontawesome.com -->Back to top</button>
+
+  
+  <input type="checkbox" class="sidebar-toggle" id="pst-primary-sidebar-checkbox">
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox" class="sidebar-toggle" id="pst-secondary-sidebar-checkbox">
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center" action="https://neuropsychology.github.io/NeuroKit/search.html" method="get">
+  <svg class="svg-inline--fa fa-magnifying-glass" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="magnifying-glass" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg><!-- <i class="fa-solid fa-magnifying-glass"></i> Font Awesome fontawesome.com -->
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search..." aria-label="Search..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">⌘</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer" style="height: auto;">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none noprint">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar noprint">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="https://neuropsychology.github.io/NeuroKit/index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/neurokit.png" class="logo__image only-light" alt="NeuroKit2 0.2.12 documentation - Home">
+    <script>document.write(`<img src="../../_static/neurokit.png" class="logo__image only-dark" alt="NeuroKit2 0.2.12 documentation - Home"/>`);</script><img src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/neurokit.png" class="logo__image only-dark" alt="NeuroKit2 0.2.12 documentation - Home">
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script>
+   <button class="btn search-button-field search-button__button" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip" data-bs-original-title="Search">
+    <svg class="svg-inline--fa fa-magnifying-glass" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="magnifying-glass" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg><!-- <i class="fa-solid fa-magnifying-glass"></i> Font Awesome fontawesome.com -->
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">⌘</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ </div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Menu</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/introduction.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/authors.html">Authors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/cite_us.html">Cite us</a></li>
+<li class="toctree-l1"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/codebook.html">Codebook</a></li>
+
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/index.html">Examples</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><svg class="svg-inline--fa fa-chevron-down" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="chevron-down" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"></path></svg><!-- <i class="fa-solid fa-chevron-down"></i> Font Awesome fontawesome.com --></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/bio_eventrelated/bio_eventrelated.html">Event-related Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/bio_intervalrelated/bio_intervalrelated.html">Interval-related Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/bio_custom/bio_custom.html">Customize your Processing Pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_hrv/ecg_hrv.html">Heart Rate Variability (HRV)</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#">Extract and Visualize Individual Heartbeats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_delineate/ecg_delineate.html">Locate P, Q, S and T waves in ECG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_edr/ecg_edr.html">ECG-Derived Respiration (EDR)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_generate_12leads/ecg_generate_12leads.html">Generating Abnormal 12-leads ECG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/eda_peaks/eda_peaks.html">Analyze Electrodermal Activity (EDA)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/rsp_rrv/rsp_rrv.html">Respiratory Rate Variability (RRV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/eog_analyze/eog_analyze.html">Analyze Electrooculography (EOG)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/signal_simulation/signal_simulation.html">Simulate Artificial Physiological Signals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/ppg_report/ppg_report.html">Save Preprocessing Reports</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/eeg_power/eeg_power.html">EEG Power in Frequency Bands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/eeg_complexity/eeg_complexity.html">EEG Complexity Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/eeg_microstates/eeg_microstates.html">EEG Microstates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/misc_fit_function/misc_fit_function.html">Fit a function to a non-linear pattern</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/examples/misc_epochs_create/misc_epochs_create.html">Create epochs</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/index.html">Functions</a><details><summary><span class="toctree-toggle" role="presentation"><svg class="svg-inline--fa fa-chevron-down" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="chevron-down" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"></path></svg><!-- <i class="fa-solid fa-chevron-down"></i> Font Awesome fontawesome.com --></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/bio.html">Bio</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/ecg.html">ECG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/ppg.html">PPG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/rsp.html">RSP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/eda.html">EDA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/emg.html">EMG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/eog.html">EOG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/eeg.html">EEG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/video.html">Video Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/microstates.html">Microstates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/signal.html">Signal</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/events.html">Events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/epochs.html">Epochs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/data.html">Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/complexity.html">Complexity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/markov.html">Markov Chains</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/stats.html">Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/misc.html">Misc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/functions/benchmark.html">Benchmarking</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/resources/index.html">Resources</a><details><summary><span class="toctree-toggle" role="presentation"><svg class="svg-inline--fa fa-chevron-down" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="chevron-down" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"></path></svg><!-- <i class="fa-solid fa-chevron-down"></i> Font Awesome fontawesome.com --></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/resources/learn_python.html">Learn Python in 10 minutes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/resources/contributing.html">Contributing guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/resources/recording.html">Recording good quality signals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/resources/resources.html">Additional Resources</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/studies/index.html">Studies</a><details><summary><span class="toctree-toggle" role="presentation"><svg class="svg-inline--fa fa-chevron-down" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="chevron-down" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"></path></svg><!-- <i class="fa-solid fa-chevron-down"></i> Font Awesome fontawesome.com --></span></summary><ul>
+<li class="toctree-l2"><a class="reference external" href="https://www.mdpi.com/1424-8220/21/12/3998">HRV Review</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://psyarxiv.com/mwa6x/">HRV Indices</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9307944/">HRV Tutorial</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://onlinelibrary.wiley.com/doi/10.1111/ejn.15800">Complexity Review</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://www.mdpi.com/1099-4300/24/8/1036">Complexity Indices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/studies/complexity_eeg.html">EEG Complexity: Parameters Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/studies/erp_gam.html">EEG Analysis with GAMs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/studies/ecg_benchmark.html">ECG Benchmark</a></li>
+<li class="toctree-l2"><a class="reference internal" href="https://neuropsychology.github.io/NeuroKit/studies/eog_blinktemplate.html">EOG blink template</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/neuropsychology/NeuroKit">Repository</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none noprint">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" data-bs-placement="bottom" data-bs-toggle="tooltip" aria-label="Toggle primary sidebar" data-bs-original-title="Toggle primary sidebar">
+  <svg class="svg-inline--fa fa-bars" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="bars" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" data-fa-i2svg=""><path fill="currentColor" d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"></path></svg><!-- <span class="fa-solid fa-bars"></span> Font Awesome fontawesome.com -->
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <svg class="svg-inline--fa fa-github" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="github" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512" data-fa-i2svg=""><path fill="currentColor" d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg><!-- <i class="fab fa-github"></i> Font Awesome fontawesome.com -->
+  </button>
+  <ul class="dropdown-menu dropdown-menu-dark">
+      
+      
+      
+      <li><a href="https://github.com/neuropsychology/NeuroKit" target="_blank" class="btn btn-sm btn-source-repository-button dropdown-item" data-bs-placement="left" data-bs-toggle="tooltip" data-bs-original-title="Source repository">
+  
+
+<span class="btn__icon-container">
+  <svg class="svg-inline--fa fa-github" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="github" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512" data-fa-i2svg=""><path fill="currentColor" d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg><!-- <i class="fab fa-github"></i> Font Awesome fontawesome.com -->
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/neuropsychology/NeuroKit/edit/dev/docs/examples/ecg_heartbeats/ecg_heartbeats.ipynb" target="_blank" class="btn btn-sm btn-source-edit-button dropdown-item" data-bs-placement="left" data-bs-toggle="tooltip" data-bs-original-title="Suggest edit">
+  
+
+<span class="btn__icon-container">
+  <svg class="svg-inline--fa fa-pencil" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="pencil" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M410.3 231l11.3-11.3-33.9-33.9-62.1-62.1L291.7 89.8l-11.3 11.3-22.6 22.6L58.6 322.9c-10.4 10.4-18 23.3-22.2 37.4L1 480.7c-2.5 8.4-.2 17.5 6.1 23.7s15.3 8.5 23.7 6.1l120.3-35.4c14.1-4.2 27-11.8 37.4-22.2L387.7 253.7 410.3 231zM160 399.4l-9.1 22.7c-4 3.1-8.5 5.4-13.3 6.9L59.4 452l23-78.1c1.4-4.9 3.8-9.4 6.9-13.3l22.7-9.1v32c0 8.8 7.2 16 16 16h32zM362.7 18.7L348.3 33.2 325.7 55.8 314.3 67.1l33.9 33.9 62.1 62.1 33.9 33.9 11.3-11.3 22.6-22.6 14.5-14.5c25-25 25-65.5 0-90.5L453.3 18.7c-25-25-65.5-25-90.5 0zm-47.4 168l-144 144c-6.2 6.2-16.4 6.2-22.6 0s-6.2-16.4 0-22.6l144-144c6.2-6.2 16.4-6.2 22.6 0s6.2 16.4 0 22.6z"></path></svg><!-- <i class="fas fa-pencil-alt"></i> Font Awesome fontawesome.com -->
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/neuropsychology/NeuroKit/issues/new?title=Issue%20on%20page%20%2Fexamples/ecg_heartbeats/ecg_heartbeats.html&amp;body=Your%20issue%20content%20here." target="_blank" class="btn btn-sm btn-source-issues-button dropdown-item" data-bs-placement="left" data-bs-toggle="tooltip" data-bs-original-title="Open an issue">
+  
+
+<span class="btn__icon-container">
+  <svg class="svg-inline--fa fa-lightbulb" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="lightbulb" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" data-fa-i2svg=""><path fill="currentColor" d="M272 384c9.6-31.9 29.5-59.1 49.2-86.2l0 0c5.2-7.1 10.4-14.2 15.4-21.4c19.8-28.5 31.4-63 31.4-100.3C368 78.8 289.2 0 192 0S16 78.8 16 176c0 37.3 11.6 71.9 31.4 100.3c5 7.2 10.2 14.3 15.4 21.4l0 0c19.8 27.1 39.7 54.4 49.2 86.2H272zM192 512c44.2 0 80-35.8 80-80V416H112v16c0 44.2 35.8 80 80 80zM112 176c0 8.8-7.2 16-16 16s-16-7.2-16-16c0-61.9 50.1-112 112-112c8.8 0 16 7.2 16 16s-7.2 16-16 16c-44.2 0-80 35.8-80 80z"></path></svg><!-- <i class="fas fa-lightbulb"></i> Font Awesome fontawesome.com -->
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <svg class="svg-inline--fa fa-download" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="download" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32V274.7l-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7V32zM64 352c-35.3 0-64 28.7-64 64v32c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V416c0-35.3-28.7-64-64-64H346.5l-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352H64zm368 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z"></path></svg><!-- <i class="fas fa-download"></i> Font Awesome fontawesome.com -->
+  </button>
+  <ul class="dropdown-menu dropdown-menu-dark">
+      
+      
+      
+      <li><a href="https://neuropsychology.github.io/NeuroKit/_sources/examples/ecg_heartbeats/ecg_heartbeats.ipynb" target="_blank" class="btn btn-sm btn-download-source-button dropdown-item" data-bs-placement="left" data-bs-toggle="tooltip" data-bs-original-title="Download source file">
+  
+
+<span class="btn__icon-container">
+  <svg class="svg-inline--fa fa-file" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="file" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" data-fa-i2svg=""><path fill="currentColor" d="M0 64C0 28.7 28.7 0 64 0H224V128c0 17.7 14.3 32 32 32H384V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64zm384 64H256V0L384 128z"></path></svg><!-- <i class="fas fa-file"></i> Font Awesome fontawesome.com -->
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()" class="btn btn-sm btn-download-pdf-button dropdown-item" data-bs-placement="left" data-bs-toggle="tooltip" data-bs-original-title="Print to PDF">
+  
+
+<span class="btn__icon-container">
+  <svg class="svg-inline--fa fa-file-pdf" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="file-pdf" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M0 64C0 28.7 28.7 0 64 0L224 0l0 128c0 17.7 14.3 32 32 32l128 0 0 144-208 0c-35.3 0-64 28.7-64 64l0 144-48 0c-35.3 0-64-28.7-64-64L0 64zm384 64l-128 0L256 0 384 128zM176 352l32 0c30.9 0 56 25.1 56 56s-25.1 56-56 56l-16 0 0 32c0 8.8-7.2 16-16 16s-16-7.2-16-16l0-48 0-80c0-8.8 7.2-16 16-16zm32 80c13.3 0 24-10.7 24-24s-10.7-24-24-24l-16 0 0 48 16 0zm96-80l32 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-32 0c-8.8 0-16-7.2-16-16l0-128c0-8.8 7.2-16 16-16zm32 128c8.8 0 16-7.2 16-16l0-64c0-8.8-7.2-16-16-16l-16 0 0 96 16 0zm80-112c0-8.8 7.2-16 16-16l48 0c8.8 0 16 7.2 16 16s-7.2 16-16 16l-32 0 0 32 32 0c8.8 0 16 7.2 16 16s-7.2 16-16 16l-32 0 0 48c0 8.8-7.2 16-16 16s-16-7.2-16-16l0-64 0-64z"></path></svg><!-- <i class="fas fa-file-pdf"></i> Font Awesome fontawesome.com -->
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()" class="btn btn-sm btn-fullscreen-button" data-bs-placement="bottom" data-bs-toggle="tooltip" aria-label="Fullscreen mode" data-bs-original-title="Fullscreen mode">
+  
+
+<span class="btn__icon-container">
+  <svg class="svg-inline--fa fa-expand" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="expand" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" data-fa-i2svg=""><path fill="currentColor" d="M32 32C14.3 32 0 46.3 0 64v96c0 17.7 14.3 32 32 32s32-14.3 32-32V96h64c17.7 0 32-14.3 32-32s-14.3-32-32-32H32zM64 352c0-17.7-14.3-32-32-32s-32 14.3-32 32v96c0 17.7 14.3 32 32 32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32H64V352zM320 32c-17.7 0-32 14.3-32 32s14.3 32 32 32h64v64c0 17.7 14.3 32 32 32s32-14.3 32-32V64c0-17.7-14.3-32-32-32H320zM448 352c0-17.7-14.3-32-32-32s-32 14.3-32 32v64H320c-17.7 0-32 14.3-32 32s14.3 32 32 32h96c17.7 0 32-14.3 32-32V352z"></path></svg><!-- <i class="fas fa-expand"></i> Font Awesome fontawesome.com -->
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip" data-bs-original-title="light/dark">
+    <svg class="svg-inline--fa fa-sun theme-switch fa-lg" data-mode="light" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="sun" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"></path></svg><!-- <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i> Font Awesome fontawesome.com -->
+    <svg class="svg-inline--fa fa-moon theme-switch fa-lg" data-mode="dark" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="moon" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" data-fa-i2svg=""><path fill="currentColor" d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"></path></svg><!-- <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i> Font Awesome fontawesome.com -->
+    <svg class="svg-inline--fa fa-circle-half-stroke theme-switch fa-lg" data-mode="auto" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="circle-half-stroke" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M448 256c0-106-86-192-192-192V448c106 0 192-86 192-192zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256z"></path></svg><!-- <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i> Font Awesome fontawesome.com -->
+  </button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip" data-bs-original-title="Search">
+    <svg class="svg-inline--fa fa-magnifying-glass fa-lg" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="magnifying-glass" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"></path></svg><!-- <i class="fa-solid fa-magnifying-glass fa-lg"></i> Font Awesome fontawesome.com -->
+  </button>
+
+<button class="sidebar-toggle secondary-toggle btn btn-sm" data-bs-placement="bottom" data-bs-toggle="tooltip" aria-label="Toggle secondary sidebar" data-bs-original-title="Toggle secondary sidebar">
+    <svg class="svg-inline--fa fa-list" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="list" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M40 48C26.7 48 16 58.7 16 72v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V72c0-13.3-10.7-24-24-24H40zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zM16 232v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V232c0-13.3-10.7-24-24-24H40c-13.3 0-24 10.7-24 24zM40 368c-13.3 0-24 10.7-24 24v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V392c0-13.3-10.7-24-24-24H40z"></path></svg><!-- <span class="fa-solid fa-list"></span> Font Awesome fontawesome.com -->
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Extract and Visualize Individual Heartbeats</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-the-cleaned-ecg-signal">Extract the cleaned ECG signal</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-r-peaks-location">Extract R-peaks location</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#segment-the-signal-around-the-heart-beats">Segment the signal around the heart beats</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#advanced-plotting">Advanced Plotting</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#custom-colors-and-legend">Custom colors and legend</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#interactivity">Interactivity</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="extract-and-visualize-individual-heartbeats">
+<h1>Extract and Visualize Individual Heartbeats<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-and-visualize-individual-heartbeats" title="Link to this heading">#</a></h1>
+<p>This example can be referenced by <a class="reference external" href="https://neuropsychology.github.io/NeuroKit/cite_us.html">citing the package</a>.</p>
+<p>This example shows how to use NeuroKit to extract and visualize the QRS complexes (individual heartbeats) from an electrocardiogram (ECG).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell0" tabindex="-1"><span></span><span class="c1"># Load NeuroKit and other useful packages</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">neurokit2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nk</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-input docutils container">
+</div>
+<section id="extract-the-cleaned-ecg-signal">
+<h2>Extract the cleaned ECG signal<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-the-cleaned-ecg-signal" title="Link to this heading">#</a></h2>
+<p>In this example, we will use a simulated ECG signal. However, you can use any of your signal (for instance, extracted from the dataframe using the <a class="reference external" href="https://neuropsychology.github.io/NeuroKit/functions/data.html#read-acqknowledge">read_acqknowledge()</a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell1" tabindex="-1"><span></span><span class="c1"># Simulate 30 seconds of ECG Signal (recorded at 250 samples / second)</span>
+<span class="n">ecg_signal</span> <span class="o">=</span> <span class="n">nk</span><span class="o">.</span><span class="n">ecg_simulate</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="o">=</span><span class="mi">250</span><span class="p">)</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+</div>
+<p>Once you have a raw ECG signal in the shape of a vector (i.e., a one-dimensional array), or a list, you can use <a class="reference external" href="https://neuropsychology.github.io/NeuroKit/functions/ecg.html#ecg-process">ecg_process()</a> to process it.</p>
+<p><em>Note: It is critical that you specify the correct sampling rate of your signal throughout many processing functions, as this allows NeuroKit to have a time reference.</em></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell2" tabindex="-1"><span></span><span class="c1"># Automatically process the (raw) ECG signal</span>
+<span class="n">signals</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="n">nk</span><span class="o">.</span><span class="n">ecg_process</span><span class="p">(</span><span class="n">ecg_signal</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="o">=</span><span class="mi">250</span><span class="p">)</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+</div>
+<p>This function outputs two elements, a <em>dataframe</em> containing the different signals (raw, cleaned, etc.) and a <em>dictionary</em> containing various additional information (peaks location, …).</p>
+</section>
+<section id="extract-r-peaks-location">
+<h2>Extract R-peaks location<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-r-peaks-location" title="Link to this heading">#</a></h2>
+<p>The processing function does two important things for our purpose: 1) it cleans the signal and 2) it detects the location of the R-peaks. Let’s extract these from the output.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell3" tabindex="-1"><span></span><span class="c1"># Extract clean ECG and R-peaks location</span>
+<span class="n">rpeaks</span> <span class="o">=</span> <span class="n">info</span><span class="p">[</span><span class="s2">"ECG_R_Peaks"</span><span class="p">]</span>
+<span class="n">cleaned_ecg</span> <span class="o">=</span> <span class="n">signals</span><span class="p">[</span><span class="s2">"ECG_Clean"</span><span class="p">]</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+</div>
+<p>Great. We can visualize the R-peaks location in the signal to make sure it got detected correctly by marking their location in the signal.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell4" tabindex="-1"><span></span><span class="c1"># Visualize R-peaks in ECG signal</span>
+<span class="n">plot</span> <span class="o">=</span> <span class="n">nk</span><span class="o">.</span><span class="n">events_plot</span><span class="p">(</span><span class="n">rpeaks</span><span class="p">,</span> <span class="n">cleaned_ecg</span><span class="p">)</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../../_images/019e293dfde048e2b2dab134b96e60495fe5cf3c8eb2ab4d50b87e6bdfc54f57.png" src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/019e293dfde048e2b2dab134b96e60495fe5cf3c8eb2ab4d50b87e6bdfc54f57.png">
+</div>
+</div>
+<p>Once that we know where the R-peaks are located, we can create windows of signal around them (of a length of for instance 1 second, ranging from 400 ms before the R-peak), which we can refer to as <em>epochs</em>.</p>
+</section>
+<section id="segment-the-signal-around-the-heart-beats">
+<h2>Segment the signal around the heart beats<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#segment-the-signal-around-the-heart-beats" title="Link to this heading">#</a></h2>
+<p>You can now epoch all these individual heart beats, synchronized by their R peaks with the <a class="reference external" href="https://neuropsychology.github.io/NeuroKit/functions/ecg.html#ecg-segment">ecg_segment()</a> function.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell5" tabindex="-1"><span></span><span class="c1"># Plotting all the heart beats</span>
+<span class="n">epochs</span> <span class="o">=</span> <span class="n">nk</span><span class="o">.</span><span class="n">ecg_segment</span><span class="p">(</span><span class="n">cleaned_ecg</span><span class="p">,</span> <span class="n">rpeaks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="o">=</span><span class="mi">250</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../../_images/57fc1800fe4956e4c28b0678ecad4e1058b0d87e1fde333939af7d6faa4a291c.png" src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/57fc1800fe4956e4c28b0678ecad4e1058b0d87e1fde333939af7d6faa4a291c.png">
+</div>
+</div>
+<p>This create a dictionary of dataframes for each ‘epoch’ (in this case, each heart beat).</p>
+</section>
+<section id="advanced-plotting">
+<h2>Advanced Plotting<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#advanced-plotting" title="Link to this heading">#</a></h2>
+<p>This section is written for a more advanced purpose of plotting and visualizing all the heartbeats segments. The code below uses packages other than <em>NeuroKit2</em> to manually set the colour gradient of the signals and to create a more interactive experience for the user - by hovering your cursor over each signal, an annotation of the signal corresponding to the heart beat index is shown.</p>
+<section id="custom-colors-and-legend">
+<h3>Custom colors and legend<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#custom-colors-and-legend" title="Link to this heading">#</a></h3>
+<p>Here, we define a function to create the epochs. It takes in <code class="docutils literal notranslate"><span class="pre">cleaned</span></code> as the cleaned signal dataframe, and <code class="docutils literal notranslate"><span class="pre">peaks</span></code> as the array of R-peaks locations.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell6" tabindex="-1"><span></span><span class="c1"># Define a function to create epochs</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_heartbeats</span><span class="p">(</span><span class="n">cleaned</span><span class="p">,</span> <span class="n">peaks</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span> 
+    <span class="n">heartbeats</span> <span class="o">=</span> <span class="n">nk</span><span class="o">.</span><span class="n">epochs_create</span><span class="p">(</span><span class="n">cleaned</span><span class="p">,</span> 
+                                  <span class="n">events</span><span class="o">=</span><span class="n">peaks</span><span class="p">,</span> 
+                                  <span class="n">epochs_start</span><span class="o">=-</span><span class="mf">0.3</span><span class="p">,</span> 
+                                  <span class="n">epochs_end</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> 
+                                  <span class="n">sampling_rate</span><span class="o">=</span><span class="n">sampling_rate</span><span class="p">)</span>
+    <span class="n">heartbeats</span> <span class="o">=</span> <span class="n">nk</span><span class="o">.</span><span class="n">epochs_to_df</span><span class="p">(</span><span class="n">heartbeats</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">heartbeats</span>
+    
+<span class="n">heartbeats</span> <span class="o">=</span> <span class="n">extract_heartbeats</span><span class="p">(</span><span class="n">cleaned_ecg</span><span class="p">,</span> <span class="n">peaks</span><span class="o">=</span><span class="n">rpeaks</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="o">=</span><span class="mi">250</span><span class="p">)</span>
+<span class="n">heartbeats</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell6">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html" tabindex="-1"><div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Signal</th>
+      <th>Index</th>
+      <th>Label</th>
+      <th>Time</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>-0.202155</td>
+      <td>137</td>
+      <td>1</td>
+      <td>-0.300000</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>-0.197095</td>
+      <td>138</td>
+      <td>1</td>
+      <td>-0.295977</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>-0.191988</td>
+      <td>139</td>
+      <td>1</td>
+      <td>-0.291954</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>-0.186777</td>
+      <td>140</td>
+      <td>1</td>
+      <td>-0.287931</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>-0.181392</td>
+      <td>141</td>
+      <td>1</td>
+      <td>-0.283908</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<p>We then pivot the dataframe so that each column corresponds to the signal values of one channel, or <em>Label</em>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell7" tabindex="-1"><span></span><span class="n">heartbeats_pivoted</span> <span class="o">=</span> <span class="n">heartbeats</span><span class="o">.</span><span class="n">pivot</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'Time'</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s1">'Label'</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="s1">'Signal'</span><span class="p">)</span>
+<span class="n">heartbeats_pivoted</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell7">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html" tabindex="0"><div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Label</th>
+      <th>1</th>
+      <th>10</th>
+      <th>11</th>
+      <th>12</th>
+      <th>13</th>
+      <th>14</th>
+      <th>15</th>
+      <th>16</th>
+      <th>17</th>
+      <th>18</th>
+      <th>...</th>
+      <th>31</th>
+      <th>32</th>
+      <th>33</th>
+      <th>34</th>
+      <th>4</th>
+      <th>5</th>
+      <th>6</th>
+      <th>7</th>
+      <th>8</th>
+      <th>9</th>
+    </tr>
+    <tr>
+      <th>Time</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>-0.300000</th>
+      <td>-0.202155</td>
+      <td>-0.133595</td>
+      <td>-0.141430</td>
+      <td>-0.140215</td>
+      <td>-0.136049</td>
+      <td>-0.137369</td>
+      <td>-0.136187</td>
+      <td>-0.133754</td>
+      <td>-0.129326</td>
+      <td>-0.132861</td>
+      <td>...</td>
+      <td>-0.129242</td>
+      <td>-0.130977</td>
+      <td>-0.145305</td>
+      <td>-0.119472</td>
+      <td>-0.122074</td>
+      <td>-0.142960</td>
+      <td>-0.132231</td>
+      <td>-0.127777</td>
+      <td>-0.140443</td>
+      <td>-0.134160</td>
+    </tr>
+    <tr>
+      <th>-0.295977</th>
+      <td>-0.197095</td>
+      <td>-0.132786</td>
+      <td>-0.140686</td>
+      <td>-0.138942</td>
+      <td>-0.135081</td>
+      <td>-0.136421</td>
+      <td>-0.135207</td>
+      <td>-0.132700</td>
+      <td>-0.128324</td>
+      <td>-0.131677</td>
+      <td>...</td>
+      <td>-0.128444</td>
+      <td>-0.129874</td>
+      <td>-0.144538</td>
+      <td>-0.118921</td>
+      <td>-0.121162</td>
+      <td>-0.142057</td>
+      <td>-0.130849</td>
+      <td>-0.126857</td>
+      <td>-0.139696</td>
+      <td>-0.133293</td>
+    </tr>
+    <tr>
+      <th>-0.291954</th>
+      <td>-0.191988</td>
+      <td>-0.131824</td>
+      <td>-0.139768</td>
+      <td>-0.137524</td>
+      <td>-0.133984</td>
+      <td>-0.135339</td>
+      <td>-0.134076</td>
+      <td>-0.131478</td>
+      <td>-0.127152</td>
+      <td>-0.130340</td>
+      <td>...</td>
+      <td>-0.127535</td>
+      <td>-0.128645</td>
+      <td>-0.143580</td>
+      <td>-0.118265</td>
+      <td>-0.120065</td>
+      <td>-0.141029</td>
+      <td>-0.129334</td>
+      <td>-0.125763</td>
+      <td>-0.138797</td>
+      <td>-0.132291</td>
+    </tr>
+    <tr>
+      <th>-0.287931</th>
+      <td>-0.186777</td>
+      <td>-0.130672</td>
+      <td>-0.138635</td>
+      <td>-0.135919</td>
+      <td>-0.132737</td>
+      <td>-0.134102</td>
+      <td>-0.132763</td>
+      <td>-0.130036</td>
+      <td>-0.125764</td>
+      <td>-0.128802</td>
+      <td>...</td>
+      <td>-0.126488</td>
+      <td>-0.127270</td>
+      <td>-0.142376</td>
+      <td>-0.117478</td>
+      <td>-0.118734</td>
+      <td>-0.139853</td>
+      <td>-0.127647</td>
+      <td>-0.124453</td>
+      <td>-0.137714</td>
+      <td>-0.131091</td>
+    </tr>
+    <tr>
+      <th>-0.283908</th>
+      <td>-0.181392</td>
+      <td>-0.129295</td>
+      <td>-0.137229</td>
+      <td>-0.134062</td>
+      <td>-0.131305</td>
+      <td>-0.132681</td>
+      <td>-0.131223</td>
+      <td>-0.128313</td>
+      <td>-0.124113</td>
+      <td>-0.127004</td>
+      <td>...</td>
+      <td>-0.125278</td>
+      <td>-0.125709</td>
+      <td>-0.140865</td>
+      <td>-0.116523</td>
+      <td>-0.117109</td>
+      <td>-0.138503</td>
+      <td>-0.125742</td>
+      <td>-0.122886</td>
+      <td>-0.136404</td>
+      <td>-0.129610</td>
+    </tr>
+  </tbody>
+</table>
+<p>5 rows × 34 columns</p>
+</div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell8" tabindex="0"><span></span><span class="c1"># Prepare figure</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Individual Heart Beats"</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Time (seconds)"</span><span class="p">)</span>
+
+<span class="c1"># Aesthetics</span>
+<span class="n">labels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">heartbeats_pivoted</span><span class="p">)</span>
+<span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'Channel '</span> <span class="o">+</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">]</span> <span class="c1"># Set labels for each signal</span>
+<span class="n">cmap</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">YlOrRd</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">heartbeats</span><span class="p">[</span><span class="s2">"Label"</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()))))</span> <span class="c1"># Get color map</span>
+<span class="n">lines</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># Create empty list to contain the plot of each signal</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">heartbeats_pivoted</span><span class="p">,</span> <span class="n">cmap</span><span class="p">):</span>
+    <span class="n">line</span><span class="p">,</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">heartbeats_pivoted</span><span class="p">[</span><span class="n">x</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">'</span><span class="si">%s</span><span class="s1">'</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+    <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell8">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../../_images/a61e5fba4c7a18760533709152d2ba1d57b5d678f9a70984b3a4f382089e1ef1.png" src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/a61e5fba4c7a18760533709152d2ba1d57b5d678f9a70984b3a4f382089e1ef1.png">
+</div>
+</div>
+</section>
+<section id="interactivity">
+<h3>Interactivity<a class="headerlink" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#interactivity" title="Link to this heading">#</a></h3>
+<p>This section of the code incorporates the aesthetics and interactivity of the plot produced. Unfortunately, the interactivity is not active in this example but it should work in your console! As you hover your cursor over each signal, annotation of the channel that produced it is shown. You will need to uncomment the code below.</p>
+<p><em>Note: you need to install the <code class="docutils literal notranslate"><span class="pre">mplcursors</span></code> package for the interactive part (<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">mplcursors</span></code>)</em></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre id="codecell9" tabindex="0"><span></span><span class="c1"># # Import packages</span>
+<span class="c1"># import ipywidgets as widgets</span>
+<span class="c1"># from ipywidgets import interact, interact_manual</span>
+
+<span class="c1"># import mplcursors</span>
+
+<span class="c1"># # Obtain hover cursor</span>
+<span class="c1"># mplcursors.cursor(lines, hover=True, highlight=True).connect("add", lambda sel: sel.annotation.set_text(sel.artist.get_label())) </span>
+<span class="c1"># # Return figure</span>
+<span class="c1"># fig</span>
+</pre><button class="copybtn o-tooltip--left" data-tooltip="Copy" data-clipboard-target="#codecell9">
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copy" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Copy to clipboard</title>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"></path>
+</svg>
+    </button></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_hrv/ecg_hrv.html" title="previous page">
+      <svg class="svg-inline--fa fa-angle-left" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="angle-left" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" data-fa-i2svg=""><path fill="currentColor" d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"></path></svg><!-- <i class="fa-solid fa-angle-left"></i> Font Awesome fontawesome.com -->
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Heart Rate Variability (HRV)</p>
+      </div>
+    </a>
+    <a class="right-next" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_delineate/ecg_delineate.html" title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Locate P, Q, S and T waves in ECG</p>
+      </div>
+      <svg class="svg-inline--fa fa-angle-right" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="angle-right" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" data-fa-i2svg=""><path fill="currentColor" d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"></path></svg><!-- <i class="fa-solid fa-angle-right"></i> Font Awesome fontawesome.com -->
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc noprint"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <svg class="svg-inline--fa fa-list" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="list" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" data-fa-i2svg=""><path fill="currentColor" d="M40 48C26.7 48 16 58.7 16 72v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V72c0-13.3-10.7-24-24-24H40zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zM16 232v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V232c0-13.3-10.7-24-24-24H40c-13.3 0-24 10.7-24 24zM40 368c-13.3 0-24 10.7-24 24v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V392c0-13.3-10.7-24-24-24H40z"></path></svg><!-- <i class="fa-solid fa-list"></i> Font Awesome fontawesome.com --> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry active"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-the-cleaned-ecg-signal">Extract the cleaned ECG signal</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#extract-r-peaks-location">Extract R-peaks location</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#segment-the-signal-around-the-heart-beats">Segment the signal around the heart beats</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#advanced-plotting">Advanced Plotting</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#custom-colors-and-legend">Custom colors and legend</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="https://neuropsychology.github.io/NeuroKit/examples/ecg_heartbeats/ecg_heartbeats.html#interactivity">Interactivity</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content noprint">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By <a href="https://dominiquemakowski.github.io/">Dominique Makowski</a> and the <a href="https://github.com/neuropsychology/NeuroKit/blob/master/AUTHORS.rst">Team</a>. This documentation is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> license.
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2020–2025.
+      <br>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/bootstrap.js"></script>
+<script src="./Extract and Visualize Individual Heartbeats — NeuroKit2 0.2.12 documentation_files/pydata-sphinx-theme.js"></script>
+
+  <footer class="bd-footer noprint">
+  </footer>
+  
+</body></html>
