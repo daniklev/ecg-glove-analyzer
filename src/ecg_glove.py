@@ -26,7 +26,7 @@ class EcgGlove:
 
     # Constants for signal processing
     DEFAULT_SAMPLING_RATE = 500  # Hz
-    DEFAULT_CLEAN_METHOD = "neurokit"
+    DEFAULT_CLEAN_METHOD = "none"
     DEFAULT_PEAK_METHOD = "neurokit"
     DEFAULT_DELINEATE_METHOD = "dwt"
 
@@ -143,17 +143,25 @@ class EcgGlove:
             self.lead_signals[lead] = filtered
 
         # Clean the filtered signals
-        self.cleaned_signals = {
-            lead: np.array(
-                nk.ecg_clean(
-                    signal_data,
-                    sampling_rate=self.sampling_rate,
-                    method=self.clean_config["method"],
-                ),
-                dtype=np.float64,
-            )
-            for lead, signal_data in self.lead_signals.items()
-        }
+        if self.clean_config["method"] == "none":
+            # If no cleaning method is selected, use filtered signals as cleaned signals
+            self.cleaned_signals = {
+                lead: signal_data.copy()
+                for lead, signal_data in self.lead_signals.items()
+            }
+        else:
+            # Apply the selected cleaning method
+            self.cleaned_signals = {
+                lead: np.array(
+                    nk.ecg_clean(
+                        signal_data,
+                        sampling_rate=self.sampling_rate,
+                        method=self.clean_config["method"],
+                    ),
+                    dtype=np.float64,
+                )
+                for lead, signal_data in self.lead_signals.items()
+            }
 
         # Update ecg_data dictionary
         self.ecg_data["raw_signals"] = self.raw_signals

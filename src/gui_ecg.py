@@ -44,18 +44,18 @@ class CollapsibleBox(QGroupBox):
         self.setCheckable(True)
         self.setChecked(True)
         self.toggled.connect(self._on_toggled)
-        
+
         # Create main layout
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(5, 20, 5, 5)  # Top margin for title
-        
+
         # Create content widget
         self.content = QWidget(self)
         self.content_layout = QVBoxLayout(self.content)
         self.content_layout.setContentsMargins(5, 5, 5, 5)
-        
+
         main_layout.addWidget(self.content)
-        
+
         # Set initial state
         self._on_toggled(self.isChecked())
 
@@ -69,7 +69,7 @@ class CollapsibleBox(QGroupBox):
 
     def addWidget(self, widget):
         self.content_layout.addWidget(widget)
-    
+
     def addLayout(self, layout):
         self.content_layout.addLayout(layout)
 
@@ -99,18 +99,21 @@ class EcgTab(QWidget):
         signal_type_widget = QWidget()
         signal_type_layout = QVBoxLayout(signal_type_widget)
         signal_type_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         signal_type_title = QLabel("Signal Type")
-        signal_type_title.setStyleSheet("font-weight: bold; color: #e0e0e0; font-size: 12px; margin-bottom: 5px;")
+        signal_type_title.setStyleSheet(
+            "font-weight: bold; color: #e0e0e0; font-size: 12px; margin-bottom: 5px;"
+        )
         signal_type_title.setFixedHeight(20)  # Fixed height for alignment
-        
+
         self.signal_type_combo = QComboBox()
         self.signal_type_combo.addItems(["Raw", "Filtered", "Cleaned"])
         self.signal_type_combo.setCurrentText("Cleaned")
         self.signal_type_combo.currentTextChanged.connect(self.update_plot)
         self.signal_type_combo.setFixedHeight(30)
         self.signal_type_combo.setMinimumWidth(80)
-        self.signal_type_combo.setStyleSheet("""
+        self.signal_type_combo.setStyleSheet(
+            """
             QComboBox {
                 background-color: #3b3b3b;
                 color: #e0e0e0;
@@ -136,30 +139,37 @@ class EcgTab(QWidget):
                 border: 1px solid #505050;
                 selection-background-color: #4a9eff;
             }
-        """)
-        
+        """
+        )
+
         signal_type_layout.addWidget(signal_type_title)
         signal_type_layout.addWidget(self.signal_type_combo)
         signal_type_layout.addStretch()
-        signal_type_widget.setMaximumWidth(120)  # Increased from 150 to accommodate text
+        signal_type_widget.setMaximumWidth(
+            120
+        )  # Increased from 150 to accommodate text
 
         # Settings section
         settings_widget = QWidget()
         settings_layout = QVBoxLayout(settings_widget)
         settings_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         settings_title = QLabel("Analysis Configuration")
-        settings_title.setStyleSheet("font-weight: bold; color: #e0e0e0; font-size: 12px; margin-bottom: 5px;")
+        settings_title.setStyleSheet(
+            "font-weight: bold; color: #e0e0e0; font-size: 12px; margin-bottom: 5px;"
+        )
         settings_title.setFixedHeight(20)  # Fixed height for alignment
-        
+
         # Create scrollable area for settings
         settings_scroll = QScrollArea()
         settings_scroll.setWidgetResizable(True)
         settings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        settings_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         settings_scroll.setMaximumHeight(130)
         settings_scroll.setStyleSheet("QScrollArea { border: none; }")
-        
+
         self.settings_label = QLabel()
         self.settings_label.setStyleSheet(
             "background-color: #3b3b3b; padding: 10px; border-radius: 5px; "
@@ -168,9 +178,9 @@ class EcgTab(QWidget):
         self.settings_label.setWordWrap(True)
         self.settings_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.update_settings_display()
-        
+
         settings_scroll.setWidget(self.settings_label)
-        
+
         settings_layout.addWidget(settings_title)
         settings_layout.addWidget(settings_scroll)
 
@@ -178,19 +188,23 @@ class EcgTab(QWidget):
         results_widget = QWidget()
         results_layout = QVBoxLayout(results_widget)
         results_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         results_title = QLabel("Analysis Results")
-        results_title.setStyleSheet("font-weight: bold; color: #e0e0e0; font-size: 12px; margin-bottom: 5px;")
+        results_title.setStyleSheet(
+            "font-weight: bold; color: #e0e0e0; font-size: 12px; margin-bottom: 5px;"
+        )
         results_title.setFixedHeight(20)  # Fixed height for alignment
-        
+
         # Create scrollable area for results
         results_scroll = QScrollArea()
         results_scroll.setWidgetResizable(True)
         results_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        results_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        results_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         results_scroll.setMaximumHeight(130)
         results_scroll.setStyleSheet("QScrollArea { border: none; }")
-        
+
         self.results_text = QLabel()
         self.results_text.setStyleSheet(
             "background-color: #3b3b3b; padding: 10px; border-radius: 5px; "
@@ -198,16 +212,16 @@ class EcgTab(QWidget):
         )
         self.results_text.setWordWrap(True)
         self.results_text.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
+
         results_scroll.setWidget(self.results_text)
-        
+
         results_layout.addWidget(results_title)
         results_layout.addWidget(results_scroll)
 
         # Add all sections to header
         header_layout.addWidget(signal_type_widget)
         header_layout.addWidget(settings_widget, 1)  # Give equal space
-        header_layout.addWidget(results_widget, 1)   # Give equal space
+        header_layout.addWidget(results_widget, 1)  # Give equal space
 
         # Set minimum height for header but allow expansion
         header_widget.setMinimumHeight(150)
@@ -230,13 +244,17 @@ class EcgTab(QWidget):
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
         vertical_splitter.addWidget(header_widget)
         vertical_splitter.addWidget(plot_widget)
-        
+
         # Set initial sizes - smaller header, larger plot area
         vertical_splitter.setSizes([180, 600])
-        
+
         # Allow header to be collapsed but not completely hidden
-        vertical_splitter.setCollapsible(0, False)  # Header cannot be completely collapsed
-        vertical_splitter.setCollapsible(1, False)  # Plot area cannot be completely collapsed
+        vertical_splitter.setCollapsible(
+            0, False
+        )  # Header cannot be completely collapsed
+        vertical_splitter.setCollapsible(
+            1, False
+        )  # Plot area cannot be completely collapsed
 
         # Add splitter to main layout
         layout.addWidget(vertical_splitter)
@@ -315,17 +333,23 @@ class EcgTab(QWidget):
         """Update the settings display label with current configuration"""
         if self.config:
             settings_text = ""
-            settings_text += f"<b>Cleaning:</b> {self.config.get('clean_method', 'neurokit')}<br>"
+            settings_text += (
+                f"<b>Cleaning:</b> {self.config.get('clean_method', 'none')}<br>"
+            )
             settings_text += f"<b>Peak Detection:</b> {self.config.get('peak_method', 'neurokit')}<br>"
 
             # Display filter settings
             filters = self.config.get("filters", [])
             if filters:
-                settings_text += f"<b>Notch Filters:</b> {', '.join(map(str, filters))} Hz<br>"
+                settings_text += (
+                    f"<b>Notch Filters:</b> {', '.join(map(str, filters))} Hz<br>"
+                )
             else:
                 settings_text += "<b>Notch Filters:</b> None<br>"
 
-            settings_text += f"<b>High-pass:</b> {self.config.get('hp_filter_type', '0.15 Hz')}<br>"
+            settings_text += (
+                f"<b>High-pass:</b> {self.config.get('hp_filter_type', '0.15 Hz')}<br>"
+            )
 
             # Additional processing options
             processing_options = []
@@ -336,7 +360,7 @@ class EcgTab(QWidget):
             if self.config.get("signal_smoothing", False):
                 window = self.config.get("smoothing_window", 5)
                 processing_options.append(f"Smoothing (w={window})")
-            
+
             if processing_options:
                 settings_text += f"<b>Processing:</b> {', '.join(processing_options)}"
             else:
@@ -351,7 +375,7 @@ class EcgTab(QWidget):
         if not self.config:
             return "Default"
 
-        clean = self.config.get("clean_method", "neurokit")
+        clean = self.config.get("clean_method", "none")
         peak = self.config.get("peak_method", "neurokit")
 
         # Add filter information
@@ -373,7 +397,7 @@ class EcgTab(QWidget):
         if self.config.get("signal_smoothing", False):
             options.append("SM")
         if self.config.get("smoothing_window", 5) is not None:
-            options.append(str(self.config['smoothing_window']))
+            options.append(str(self.config["smoothing_window"]))
 
         option_part = f"_{''.join(options)}" if options else ""
 
@@ -702,10 +726,12 @@ class EcgAnalyzerGUI(QMainWindow):
         # Create and setup sidebar with scrolling
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        sidebar_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         sidebar_scroll.setMaximumWidth(320)
-        
+
         sidebar_content = QWidget()
         sidebar_layout = QVBoxLayout(sidebar_content)
         sidebar_layout.setContentsMargins(5, 5, 5, 5)
@@ -737,8 +763,9 @@ class EcgAnalyzerGUI(QMainWindow):
         self.clean_method = QComboBox()
         self.clean_method.addItems(
             [
+                "none",
                 "neurokit",
-                "biosppy", 
+                "biosppy",
                 "vg",
                 "engzeemod2012",
                 "elgendi2010",
@@ -746,7 +773,7 @@ class EcgAnalyzerGUI(QMainWindow):
                 "pantompkins1985",
             ]
         )
-        self.clean_method.setCurrentText("neurokit")
+        self.clean_method.setCurrentText("none")
         clean_layout.addWidget(self.clean_method)
 
         # R-Peak Detection
@@ -842,7 +869,8 @@ class EcgAnalyzerGUI(QMainWindow):
 
         # Analysis button
         self.process_btn = QPushButton("Process")
-        self.process_btn.setStyleSheet("""
+        self.process_btn.setStyleSheet(
+            """
             QPushButton {
                 background-color: #4a9eff;
                 color: white;
@@ -859,7 +887,8 @@ class EcgAnalyzerGUI(QMainWindow):
                 background-color: #666666;
                 color: #999999;
             }
-        """)
+        """
+        )
         self.process_btn.clicked.connect(self.process_data)
         self.process_btn.setEnabled(False)
 
@@ -1078,35 +1107,53 @@ class EcgAnalyzerGUI(QMainWindow):
             """
 
             # Prepare data for formatting
-            analysis_lead = results['AnalysisLead']
-            
+            analysis_lead = results["AnalysisLead"]
+
             # Prepare measurements
             measurements_list = []
             if "ecgData" in results and "measurements" in results["ecgData"]:
                 measurements = results["ecgData"]["measurements"]
-                
-                if measurements.get("HeartRate_BPM"):
-                    measurements_list.append(f"<b>HR:</b> {measurements['HeartRate_BPM']:.1f} BPM")
-                if measurements.get("RR_Interval_ms"):
-                    measurements_list.append(f"<b>RR:</b> {measurements['RR_Interval_ms']:.0f} ms")
-                if measurements.get("P_Duration_ms"):
-                    measurements_list.append(f"<b>P:</b> {measurements['P_Duration_ms']:.0f} ms")
-                if measurements.get("PR_Interval_ms"):
-                    measurements_list.append(f"<b>PR:</b> {measurements['PR_Interval_ms']:.0f} ms")
-                if measurements.get("QRS_Duration_ms"):
-                    measurements_list.append(f"<b>QRS:</b> {measurements['QRS_Duration_ms']:.0f} ms")
-                if measurements.get("QT_Interval_ms"):
-                    measurements_list.append(f"<b>QT:</b> {measurements['QT_Interval_ms']:.0f} ms")
-                if measurements.get("QTc_Interval_ms"):
-                    measurements_list.append(f"<b>QTc:</b> {measurements['QTc_Interval_ms']:.0f} ms")
 
-            measurements_text = "<br>".join(measurements_list) if measurements_list else "No measurements available"
+                if measurements.get("HeartRate_BPM"):
+                    measurements_list.append(
+                        f"<b>HR:</b> {measurements['HeartRate_BPM']:.1f} BPM"
+                    )
+                if measurements.get("RR_Interval_ms"):
+                    measurements_list.append(
+                        f"<b>RR:</b> {measurements['RR_Interval_ms']:.0f} ms"
+                    )
+                if measurements.get("P_Duration_ms"):
+                    measurements_list.append(
+                        f"<b>P:</b> {measurements['P_Duration_ms']:.0f} ms"
+                    )
+                if measurements.get("PR_Interval_ms"):
+                    measurements_list.append(
+                        f"<b>PR:</b> {measurements['PR_Interval_ms']:.0f} ms"
+                    )
+                if measurements.get("QRS_Duration_ms"):
+                    measurements_list.append(
+                        f"<b>QRS:</b> {measurements['QRS_Duration_ms']:.0f} ms"
+                    )
+                if measurements.get("QT_Interval_ms"):
+                    measurements_list.append(
+                        f"<b>QT:</b> {measurements['QT_Interval_ms']:.0f} ms"
+                    )
+                if measurements.get("QTc_Interval_ms"):
+                    measurements_list.append(
+                        f"<b>QTc:</b> {measurements['QTc_Interval_ms']:.0f} ms"
+                    )
+
+            measurements_text = (
+                "<br>".join(measurements_list)
+                if measurements_list
+                else "No measurements available"
+            )
 
             # Prepare axes
             axes_list = []
             if "ecgData" in results and "measurements" in results["ecgData"]:
                 measurements = results["ecgData"]["measurements"]
-                
+
                 if measurements.get("P_Axis") is not None:
                     axes_list.append(f"<b>P:</b> {measurements['P_Axis']:.0f}°")
                 if measurements.get("QRS_Axis") is not None:
@@ -1114,14 +1161,20 @@ class EcgAnalyzerGUI(QMainWindow):
                 if measurements.get("T_Axis") is not None:
                     axes_list.append(f"<b>T:</b> {measurements['T_Axis']:.0f}°")
 
-            axes_text = "<br>".join(axes_list) if axes_list else "No axis data available"
+            axes_text = (
+                "<br>".join(axes_list) if axes_list else "No axis data available"
+            )
 
             # Prepare quality
             quality_text = ""
             if "overall_quality" in quality_results:
                 overall_quality = quality_results["overall_quality"]
                 if isinstance(overall_quality, (int, float)):
-                    quality_color = "#6bff6b" if overall_quality > 0.7 else "#ffd93d" if overall_quality > 0.4 else "#ff6b6b"
+                    quality_color = (
+                        "#6bff6b"
+                        if overall_quality > 0.7
+                        else "#ffd93d" if overall_quality > 0.4 else "#ff6b6b"
+                    )
                     quality_text = f"<span style='color: {quality_color}'>{overall_quality:.2f}</span>"
                 else:
                     quality_text = str(overall_quality)
@@ -1133,7 +1186,7 @@ class EcgAnalyzerGUI(QMainWindow):
                 analysis_lead=analysis_lead,
                 measurements=measurements_text,
                 quality=quality_text,
-                axes=axes_text
+                axes=axes_text,
             )
 
             tab.results_text.setText(result_text)
