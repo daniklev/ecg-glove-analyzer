@@ -21,13 +21,15 @@ class FilterConfig:
         notch_frequencies: List[int] = [],
         filter_type: int = 0,
         spike_removal: bool = False,
-        enable_baseline_correction: bool = False,
+        baseline_correction: bool = False,
+        human_filter: bool = False,
     ):
         self.sampling_rate = sampling_rate
         self.notch_frequencies = notch_frequencies or []
         self.filter_type = filter_type
         self.spike_removal = spike_removal
-        self.enable_baseline_correction = enable_baseline_correction
+        self.baseline_correction = baseline_correction
+        self.human_filter = human_filter
 
 
 class HiPassFilter:
@@ -173,13 +175,7 @@ def _sos_hpf_coeff(filter_type: int, fs: int):
 def apply_filters(signal: np.ndarray, config: FilterConfig) -> NDArray[np.float64]:
     out = signal.astype(float)
 
-    # 1) Notch filtering (vectorized SOS)
-    if config.notch_frequencies:
-        for freq in config.notch_frequencies:
-            sos = _sos_notch_coeff(freq, config.sampling_rate)
-            out = sosfilt(sos, out)
-
-    # 2) Primary filter
+    # 1) Primary filter
     if config.filter_type == 0:
         # morphology
         out = fast_morphology_filter(np.asarray(out, dtype=np.float64))
@@ -187,13 +183,25 @@ def apply_filters(signal: np.ndarray, config: FilterConfig) -> NDArray[np.float6
         sos = _sos_hpf_coeff(config.filter_type, config.sampling_rate)
         out = sosfilt(sos, out)
 
-    # 3) Secondary spike removal
+    # 2) Notch filtering (vectorized SOS)
+    if config.notch_frequencies:
+        for freq in config.notch_frequencies:
+            sos = _sos_notch_coeff(freq, config.sampling_rate)
+            out = sosfilt(sos, out)
+
+    # 3) Use High-Pass Filter with 0 Hz cutoff to 40 Hz
+    if config.human_filter:
+        # Human filter: 0-40 Hz
+        sos = butter(2, (0.05, 40), btype="bandpass", fs=config.sampling_rate, output="sos")
+        out = sosfilt(sos, out)
+
+    # 4) Secondary spike removal
     if config.spike_removal:
         out = fast_morphology_filter(np.asarray(out, dtype=np.float64))
 
     # 4) Baseline correction
-    if config.enable_baseline_correction:
-        bf = BaselineFilter(cutoff=0.5, fs=config.sampling_rate)
+    if config.baseline_correction:
+        bf = BaselineFilter(cutoff=0.15, fs=config.sampling_rate)
         out = np.array([bf.filter_sample(float(x)) for x in out])
 
     return np.asarray(out, dtype=np.float64)

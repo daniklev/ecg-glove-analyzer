@@ -37,6 +37,7 @@ notch_input = st.sidebar.text_input("Notch Frequencies (comma)", "50,100")
 notch_freqs = [int(x) for x in notch_input.split(",") if x.strip().isdigit()]
 spike = st.sidebar.checkbox("Spike Removal", value=True)
 baseline = st.sidebar.checkbox("Baseline Correction", value=True)
+human = st.sidebar.checkbox("Human Filter (40-100 Hz)", value=True)
 
 if st.sidebar.button("Process ECG"):
     # Read binary data
@@ -56,7 +57,8 @@ if st.sidebar.button("Process ECG"):
             notch_frequencies=notch_freqs,
             filter_type=filter_idx,
             spike_removal=spike,
-            enable_baseline_correction=baseline,
+            baseline_correction=baseline,
+            human_filter=human,
         )
         # Raw and filtered data
         raw = {ch: leads[ch] for ch in BASE_CHANNELS}
@@ -81,6 +83,7 @@ if st.sidebar.button("Process ECG"):
                     "notch": notch_freqs,
                     "spike": spike,
                     "baseline": baseline,
+                    "human": human,
                 },
                 "raw": raw,
                 "filt": filt,
@@ -166,18 +169,33 @@ if st.session_state.processed:
             # Create Plotly figure
             t = np.arange(len(data["I"])) / SAMPLING_RATE
             fig = make_subplots(rows=3, cols=4, subplot_titles=LEAD_NAMES)
-            # Global y-ranges
-            y_ranges = {
-                lead: (float(np.min(data[lead])), float(np.max(data[lead])))
-                for lead in LEAD_NAMES
-            }
+
+            # Set initial x-axis range (3 seconds)
+            # Check if full screen is enabled
+            x_range = [0, 3]  # Default to 3 seconds
+            if "full_screen" in st.session_state and st.session_state["full_screen"]:
+                # If full screen, extend to 5 seconds
+                st.session_state["full_screen"] = True
+                x_range = [0, 5]
+
+            # Calculate y-ranges centered around baseline
+            y_ranges = {}
+            for lead in LEAD_NAMES:
+                baseline = data[lead][0]  # Use first value as baseline
+                y_ranges[lead] = (baseline - 500, baseline + 500)
+
+            # Plot each lead
             for idx, lead in enumerate(LEAD_NAMES):
                 r = idx // 4 + 1
                 c = idx % 4 + 1
                 fig.add_trace(
                     go.Scatter(x=t, y=data[lead], name=lead, mode="lines"), row=r, col=c
                 )
-                fig.update_yaxes(range=y_ranges[lead], autorange=False, row=r, col=c)
+                # Set y-axis range centered around baseline
+                fig.update_yaxes(range=y_ranges[lead], row=r, col=c)
+                # Set x-axis range for 3 seconds
+                fig.update_xaxes(range=x_range, row=r, col=c)
+
             fig.update_xaxes(matches="x")
             fig.update_layout(
                 autosize=True,
