@@ -112,7 +112,7 @@ def analyze_ecg_all_leads(
     averaging per-lead, aggregating total, and returning problems for feedback.
 
     Returns:
-      lead_quality: Dict of lead -> {QualityScore, Problems: List[str]}
+      lead_quality: Dict of lead -> {QualityScore, Problems: List[str], SNR_dB, QRS_Amplitude}
       total_quality: float
       classification: str
     """
@@ -125,8 +125,10 @@ def analyze_ecg_all_leads(
     total_quality = 0.0
 
     for lead, sig in leads.items():
-        # Accumulate quality scores across windows
+        # Accumulate quality scores and metrics across windows
         q_list: List[float] = []
+        snr_list: List[float] = []
+        qrs_amp_list: List[float] = []
         flag_counts: Dict[str, int] = {k: 0 for k in FLAG_MESSAGES}
 
         for i in range(nwin):
@@ -137,18 +139,28 @@ def analyze_ecg_all_leads(
             for k, v in flags.items():
                 if v:
                     flag_counts[k] += 1
-            # Score
+            # Collect metrics
             q_list.append(compute_quality_score(flags))
+            snr_list.append(metrics["SNR_dB"])
+            qrs_amp_list.append(metrics["QRS_Amplitude"])
 
-        # Average quality
+        # Average quality and metrics
         avg_q = float(np.mean(q_list)) if q_list else 0.0
+        avg_snr = float(np.mean(snr_list)) if snr_list else 0.0
+        avg_qrs_amp = float(np.mean(qrs_amp_list)) if qrs_amp_list else 0.0
+        
         # Determine problems: any flag present in >50% of windows
         problems: List[str] = []
         for flag, count in flag_counts.items():
             if nwin > 0 and (count / nwin) > 0.5:
                 problems.append(FLAG_MESSAGES[flag])
 
-        lead_quality[lead] = {"QualityScore": avg_q, "Problems": problems}
+        lead_quality[lead] = {
+            "QualityScore": avg_q, 
+            "Problems": problems,
+            "SNR_dB": avg_snr,
+            "QRS_Amplitude": avg_qrs_amp
+        }
         total_quality += avg_q * weights.get(lead, 0.0)
 
     # Classification

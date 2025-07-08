@@ -157,6 +157,8 @@ if st.session_state.processed:
                     {
                         "Lead": lead,
                         "Quality Score": f"{quality_score:.3f}",
+                        "SNR (dB)": f"{lead_info.get('SNR_dB', 0):.2f}",
+                        "QRS Amplitude": f"{lead_info.get('QRS_Amplitude', 0):.2f}",
                         "Status": (
                             "🔴 Poor"
                             if quality_score < 0.5
