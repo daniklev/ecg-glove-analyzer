@@ -204,4 +204,9 @@ def apply_filters(signal: np.ndarray, config: FilterConfig) -> NDArray[np.float6
         bf = BaselineFilter(cutoff=0.15, fs=config.sampling_rate)
         out = np.array([bf.filter_sample(float(x)) for x in out])
 
+    #remove first 3 seconds of samples
+    skip_samples = 3 * config.sampling_rate
+    if len(out) > skip_samples:
+        out = out[skip_samples:]
+
     return np.asarray(out, dtype=np.float64)

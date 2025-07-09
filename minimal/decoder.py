@@ -105,6 +105,16 @@ class ECGPacketDecoder:
         for key in raw:
             raw[key] = raw[key][:min_len]
 
+        # Add first 3 seconds to beginning of each channel
+        sampling_rate = 500  # Default sampling rate
+        first_3_sec_samples = min(
+            3 * sampling_rate, min_len
+        )  # 3 seconds worth of samples
+
+        for key in raw:
+            first_3_sec = raw[key][:first_3_sec_samples]
+            raw[key] = np.concatenate([first_3_sec, raw[key]])
+
         # Derive the four additional leads
         leads = dict(raw)
         leads["II"] = leads["I"] + leads["III"]
