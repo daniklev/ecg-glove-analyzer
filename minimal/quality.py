@@ -50,6 +50,7 @@ def analyze_lead_quality(
     Compute signal-quality metrics for a single ECG segment.
     Returns:
       - flags: Dict of boolean flags
+      - values: Dict of computed values
       - QRS_Amplitude (float)
       - SNR_dB (float)
     """
@@ -65,19 +66,26 @@ def analyze_lead_quality(
 
     # Muscle artifact: 40–100 Hz >10%
     hf = np.sum(psd[(freqs > 40) & (freqs < 100)])
-    flags["Muscle_Artifact"] = (hf / total_power) > 0.10
+    ma = hf / total_power
+    flags["Muscle_Artifact"] = ma > 0.1
 
     # Bad electrode contact: 0.01–0.5 Hz >20%
     lf = np.sum(psd[(freqs > 0.01) & (freqs < 0.5)])
-    flags["Bad_Electrode_Contact"] = (lf / total_power) > 0.20
+    bc = lf / total_power
+    flags["Bad_Electrode_Contact"] = bc > 0.2
+    # flags["Bad_Electrode_Contact"] = (lf / total_power) > 0.20
 
     # Powerline interference: 49–51 & 59–61 Hz >5%
     p50 = np.sum(psd[(freqs > 49) & (freqs < 51)])
     p60 = np.sum(psd[(freqs > 59) & (freqs < 61)])
-    flags["Powerline_Interference"] = ((p50 + p60) / total_power) > 0.05
+    pi = (p50 + p60) / total_power
+    flags["Powerline_Interference"] = pi > 0.05
+    # flags["Powerline_Interference"] = ((p50 + p60) / total_power) > 0.05
 
     # Baseline drift: <0.5 Hz >10%
-    flags["Baseline_Drift"] = (lf / total_power) > 0.10
+    bd = lf / total_power
+    flags["Baseline_Drift"] = bd > 0.1
+    # flags["Baseline_Drift"] = (lf / total_power) > 0.10
 
     # QRS amplitude
     amp = float(np.ptp(sig))
@@ -88,9 +96,19 @@ def analyze_lead_quality(
     noise = sig - clean
     noise_power = np.mean(noise**2) + 1e-12
     snr = 10 * np.log10((amp**2) / noise_power)
-    flags["Low_SNR"] = snr < 10
+    flags["Low_SNR"] = snr < 25
 
-    return {"flags": flags, "QRS_Amplitude": amp, "SNR_dB": snr}
+    return {
+        "flags": flags,
+        "values": {
+            "m_a": ma,
+            "b_e_c": bc,
+            "p_i": pi,
+            "b_d": bd,
+        },
+        "QRS_Amplitude": amp,
+        "SNR_dB": snr,
+    }
 
 
 def compute_quality_score(flags: Dict[str, bool]) -> float:
@@ -129,6 +147,10 @@ def analyze_ecg_all_leads(
         q_list: List[float] = []
         snr_list: List[float] = []
         qrs_amp_list: List[float] = []
+        ma: List[float] = []
+        bec: List[float] = []
+        pi: List[float] = []
+        bd: List[float] = []
         flag_counts: Dict[str, int] = {k: 0 for k in FLAG_MESSAGES}
 
         for i in range(nwin):
@@ -143,12 +165,20 @@ def analyze_ecg_all_leads(
             q_list.append(compute_quality_score(flags))
             snr_list.append(metrics["SNR_dB"])
             qrs_amp_list.append(metrics["QRS_Amplitude"])
+            ma.append(metrics["values"]["m_a"])
+            bec.append(metrics["values"]["b_e_c"])
+            pi.append(metrics["values"]["p_i"])
+            bd.append(metrics["values"]["b_d"])
 
         # Average quality and metrics
         avg_q = float(np.mean(q_list)) if q_list else 0.0
         avg_snr = float(np.mean(snr_list)) if snr_list else 0.0
         avg_qrs_amp = float(np.mean(qrs_amp_list)) if qrs_amp_list else 0.0
-        
+        avg_ma = float(np.mean(ma)) if ma else 0.0
+        avg_bec = float(np.mean(bec)) if bec else 0.0
+        avg_pi = float(np.mean(pi)) if pi else 0.0
+        avg_bd = float(np.mean(bd)) if bd else 0.0
+
         # Determine problems: any flag present in >50% of windows
         problems: List[str] = []
         for flag, count in flag_counts.items():
@@ -156,10 +186,14 @@ def analyze_ecg_all_leads(
                 problems.append(FLAG_MESSAGES[flag])
 
         lead_quality[lead] = {
-            "QualityScore": avg_q, 
+            "QualityScore": avg_q,
             "Problems": problems,
             "SNR_dB": avg_snr,
-            "QRS_Amplitude": avg_qrs_amp
+            "QRS_Amplitude": avg_qrs_amp,
+            "m_a": avg_ma,
+            "b_e_c": avg_bec,
+            "p_i": avg_pi,
+            "b_d": avg_bd,
         }
         total_quality += avg_q * weights.get(lead, 0.0)
 

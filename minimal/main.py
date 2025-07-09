@@ -137,28 +137,33 @@ if st.session_state.processed:
             for lead in LEAD_NAMES:
                 lead_info = quality["lead_quality"][lead]
                 quality_score = lead_info["QualityScore"]
+                problems = lead_info.get("Problems", [])
 
-                # Flag problems based on quality metrics
-                problems = []
-                if quality_score < 0.7:
-                    problems.append("Poor Quality")
-                if lead_info.get("SNR", 0) < 10:
-                    problems.append("Low SNR")
-                if lead_info.get("PowerLineNoise", 0) > 0.1:
-                    problems.append("Power Line Noise")
-                if lead_info.get("BaselineWander", 0) > 0.2:
-                    problems.append("Baseline Wander")
-                if lead_info.get("SaturationPercentage", 0) > 5:
-                    problems.append("Saturation")
+                # # Flag problems based on quality metrics
+                # problems = []
+                # if quality_score < 0.7:
+                #     problems.append("Poor Quality")
+                # if lead_info.get("SNR", 0) < 10:
+                #     problems.append("Low SNR")
+                # if lead_info.get("PowerLineNoise", 0) > 0.1:
+                #     problems.append("Power Line Noise")
+                # if lead_info.get("BaselineWander", 0) > 0.2:
+                #     problems.append("Baseline Wander")
+                # if lead_info.get("SaturationPercentage", 0) > 5:
+                #     problems.append("Saturation")
 
                 problems_str = ", ".join(problems) if problems else "✓ Good"
 
                 lead_quality_data.append(
                     {
                         "Lead": lead,
-                        "Quality Score": f"{quality_score:.3f}",
-                        "SNR (dB)": f"{lead_info.get('SNR_dB', 0):.2f}",
-                        "QRS Amplitude": f"{lead_info.get('QRS_Amplitude', 0):.2f}",
+                        "Quality": f"{quality_score:.3f}",
+                        "SNR": f"{lead_info.get('SNR_dB', 0):.2f}",
+                        "QRS": f"{lead_info.get('QRS_Amplitude', 0):.2f}",
+                        "MA": f"{lead_info.get('m_a', 0):.2f}",
+                        "BEC": f"{lead_info.get('b_e_c', 0):.2f}",
+                        "PI": f"{lead_info.get('p_i', 0):.2f}",
+                        "BD": f"{lead_info.get('b_d', 0):.2f}",
                         "Status": (
                             "🔴 Poor"
                             if quality_score < 0.5
