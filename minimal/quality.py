@@ -123,7 +123,7 @@ def analyze_ecg_all_leads(
     leads: Dict[str, np.ndarray],
     sampling_rate: int = 500,
     weights: Dict[str, float] = CLINICAL_WEIGHTS,
-    window_sec: float = 2.0,
+    window_sec: float = 2.5,
 ) -> Dict[str, Any]:
     """
     Analyze all 12 leads, segmenting into windows, computing per-window metrics,
@@ -134,6 +134,15 @@ def analyze_ecg_all_leads(
       total_quality: float
       classification: str
     """
+    # skip_samples = 3 * sampling_rate  # 3 seconds worth of samples
+    # analysis_leads = {}
+
+    # for lead, sig in leads.items():
+    #     if len(sig) > skip_samples:
+    #         analysis_leads[lead] = sig[skip_samples:]
+    #     else:
+    #         analysis_leads[lead] = sig  # If signal is too short, use entire signal
+
     # Window parameters
     wlen = int(window_sec * sampling_rate)
     n = len(next(iter(leads.values())))
@@ -143,7 +152,6 @@ def analyze_ecg_all_leads(
     total_quality = 0.0
 
     for lead, sig in leads.items():
-        # Accumulate quality scores and metrics across windows
         q_list: List[float] = []
         snr_list: List[float] = []
         qrs_amp_list: List[float] = []

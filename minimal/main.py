@@ -132,7 +132,7 @@ if st.session_state.processed:
             # Compute quality metrics on filtered data
             quality = analyze_ecg_all_leads(item["filt"], sampling_rate=SAMPLING_RATE)
 
-            # Detailed per-lead table with problems flagged
+            # First table: Lead quality summary
             lead_quality_data = []
             for lead in LEAD_NAMES:
                 lead_info = quality["lead_quality"][lead]
@@ -158,12 +158,7 @@ if st.session_state.processed:
                     {
                         "Lead": lead,
                         "Quality": f"{quality_score:.3f}",
-                        "SNR": f"{lead_info.get('SNR_dB', 0):.2f}",
-                        "QRS": f"{lead_info.get('QRS_Amplitude', 0):.2f}",
-                        "MA": f"{lead_info.get('m_a', 0):.2f}",
-                        "BEC": f"{lead_info.get('b_e_c', 0):.2f}",
-                        "PI": f"{lead_info.get('p_i', 0):.2f}",
-                        "BD": f"{lead_info.get('b_d', 0):.2f}",
+                        # "QRS": f"{lead_info.get('QRS_Amplitude', 0):.2f}",
                         "Status": (
                             "🔴 Poor"
                             if quality_score < 0.5
@@ -172,6 +167,156 @@ if st.session_state.processed:
                         "Problems": problems_str,
                     }
                 )
+
+            # Second table: Detailed window-by-window analysis
+            window_sec = 2.5  # Same as in quality.py
+            wlen = int(window_sec * SAMPLING_RATE)
+            n = len(data["I"])
+            nwin = n // wlen if wlen > 0 else 0
+
+            # Create window analysis data structure
+            window_analysis = {}
+
+            # Initialize dataframe variables to prevent "possibly unbound" errors
+            quality_df_data = []
+            problems_df_data = []
+            snr_df_data = []
+            qrs_amp_df_data = []
+            muscle_art_df_data = []
+            bad_contact_df_data = []
+            power_int_df_data = []
+            baseline_drift_df_data = []
+
+            for lead in LEAD_NAMES:
+                window_analysis[lead] = {}
+                sig = item["filt"][lead]  # Always use filtered data for analysis
+                for i in range(nwin):
+                    seg = sig[i * wlen : (i + 1) * wlen]
+                    # Import analyze_lead_quality function
+                    from quality import analyze_lead_quality, compute_quality_score
+
+                    metrics = analyze_lead_quality(seg, SAMPLING_RATE)
+                    flags = metrics["flags"]
+                    quality_score = compute_quality_score(flags)
+
+                    # Format flags as problem indicators
+                    active_problems = [flag for flag, active in flags.items() if active]
+                    problems_str = (
+                        ", ".join(active_problems) if active_problems else "✓ Good"
+                    )
+
+                    window_key = f"W{i+1}\n({i*window_sec:.1f}-{(i+1)*window_sec:.1f}s)"
+                    window_analysis[lead][window_key] = {
+                        "quality": f"{quality_score:.3f}",
+                        "snr": f"{metrics['SNR_dB']:.2f}",
+                        "problems": problems_str,
+                        "qrs_amp": f"{metrics['QRS_Amplitude']:.2f}",
+                        "muscle_art": f"{metrics['values']['m_a']:.3f}",
+                        "bad_contact": f"{metrics['values']['b_e_c']:.3f}",
+                        "power_int": f"{metrics['values']['p_i']:.3f}",
+                        "baseline_dr": f"{metrics['values']['b_d']:.3f}",
+                    }
+
+            # Create dataframes for different metrics
+            if nwin > 0:
+                window_cols = [
+                    f"W{i+1}\n({i*window_sec:.1f}-{(i+1)*window_sec:.1f}s)"
+                    for i in range(nwin)
+                ]
+
+                # Quality Score DataFrame
+                quality_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("quality", "N/A")
+                        )
+                    quality_df_data.append(row)
+
+                # Problems DataFrame
+                problems_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("problems", "N/A")
+                        )
+                    problems_df_data.append(row)
+
+                # SNR DataFrame
+                snr_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead].get(window_key, {}).get("snr", "N/A")
+                        )
+                    snr_df_data.append(row)
+
+                # QRS Amplitude DataFrame
+                qrs_amp_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("qrs_amp", "N/A")
+                        )
+                    qrs_amp_df_data.append(row)
+
+                # Muscle Artifact DataFrame
+                muscle_art_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("muscle_art", "N/A")
+                        )
+                    muscle_art_df_data.append(row)
+
+                # Bad Contact DataFrame
+                bad_contact_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("bad_contact", "N/A")
+                        )
+                    bad_contact_df_data.append(row)
+
+                # Power Interference DataFrame
+                power_int_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("power_int", "N/A")
+                        )
+                    power_int_df_data.append(row)
+
+                # Baseline Drift DataFrame
+                baseline_drift_df_data = []
+                for lead in LEAD_NAMES:
+                    row = {"Lead": lead}
+                    for window_key in window_cols:
+                        row[window_key] = (
+                            window_analysis[lead]
+                            .get(window_key, {})
+                            .get("baseline_dr", "N/A")
+                        )
+                    baseline_drift_df_data.append(row)
 
             # Create Plotly figure
             t = np.arange(len(data["I"])) / SAMPLING_RATE
@@ -217,8 +362,41 @@ if st.session_state.processed:
                 key=f"plot_{item['id']}",
             )
 
-            # Display quality metrics - st.write doesn't accept key parameter
+            # Display quality metrics
             st.write("**Total Quality:**", quality["total_quality"])
             st.write("**Classification:**", quality["classification"])
+
+            # Display tables
+            st.subheader("Lead Quality Summary")
             st.table(lead_quality_data)
+
+            st.subheader("Detailed Window Analysis")
+            if nwin > 0:
+                st.write("**Quality Scores by Window:**")
+                st.dataframe(quality_df_data, use_container_width=True)
+
+                st.write("**Problems by Window:**")
+                st.dataframe(problems_df_data, use_container_width=True)
+
+                st.write("**SNR (dB) by Window:**")
+                st.dataframe(snr_df_data, use_container_width=True)
+
+                st.write("**QRS Amplitude by Window:**")
+                st.dataframe(qrs_amp_df_data, use_container_width=True)
+
+                st.write("**Muscle Artifact by Window:**")
+                st.dataframe(muscle_art_df_data, use_container_width=True)
+
+                st.write("**Bad Contact by Window:**")
+                st.dataframe(bad_contact_df_data, use_container_width=True)
+
+                st.write("**Power Interference by Window:**")
+                st.dataframe(power_int_df_data, use_container_width=True)
+
+                st.write("**Baseline Drift by Window:**")
+                st.dataframe(baseline_drift_df_data, use_container_width=True)
+            else:
+                st.write("No windows available for analysis.")
+
+            # Display filter config
             st.write("**Filter Config:**", item["cfg"])
