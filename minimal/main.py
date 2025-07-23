@@ -129,8 +129,8 @@ if st.session_state.processed:
             # Raw/Filtered switch
             view = st.radio("View:", ["Filtered", "Raw"], key=f"view_{item['id']}")
             data = item["raw"] if view == "Raw" else item["filt"]
-            # Compute quality metrics on filtered data
-            quality = analyze_ecg_all_leads(item["filt"], sampling_rate=SAMPLING_RATE)
+            # Compute quality metrics on filtered data with 5-second result window
+            quality = analyze_ecg_all_leads(item["filt"])
 
             # First table: Lead quality summary
             lead_quality_data = []
@@ -208,13 +208,13 @@ if st.session_state.processed:
                     window_key = f"W{i+1}\n({i*window_sec:.1f}-{(i+1)*window_sec:.1f}s)"
                     window_analysis[lead][window_key] = {
                         "quality": f"{quality_score:.3f}",
-                        "snr": f"{metrics['SNR_dB']:.2f}",
                         "problems": problems_str,
-                        "qrs_amp": f"{metrics['QRS_Amplitude']:.2f}",
-                        "muscle_art": f"{metrics['values']['m_a']:.3f}",
-                        "bad_contact": f"{metrics['values']['b_e_c']:.3f}",
-                        "power_int": f"{metrics['values']['p_i']:.3f}",
-                        "baseline_dr": f"{metrics['values']['b_d']:.3f}",
+                        "qrs_amp": f"{metrics['values']['qrs_amp']:.2f}",
+                        "snr": f"{metrics['values']['snr']:.2f}/{flags['Low_SNR']:.2f}",
+                        "muscle_art": f"{metrics['values']['m_a']:.3f}/{flags['Muscle_Artifact']:.3f}",
+                        "bad_contact": f"{metrics['values']['b_e_c']:.3f}/{flags['Bad_Electrode_Contact']:.3f}",
+                        "power_int": f"{metrics['values']['p_i']:.3f}/{flags['Powerline_Interference']:.3f}",
+                        "baseline_dr": f"{metrics['values']['b_d']:.3f}/{flags['Baseline_Drift']:.3f}",
                     }
 
             # Create dataframes for different metrics
@@ -366,6 +366,38 @@ if st.session_state.processed:
             st.write("**Total Quality:**", quality["total_quality"])
             st.write("**Classification:**", quality["classification"])
 
+            # Display best windows used for quality calculation
+            if "best_windows_used" in quality and quality["best_windows_used"]:
+                window_sec = 2.5  # Same as in quality.py
+                best_windows = quality["best_windows_used"]
+
+                # Calculate time ranges for best consecutive windows (5-second result window)
+                time_ranges = []
+                for window_idx in best_windows:
+                    start_time = window_idx * window_sec
+                    end_time = (window_idx + 1) * window_sec
+                    time_ranges.append(f"{start_time:.1f}-{end_time:.1f}s")
+
+                # Calculate overall time frame for the 5-second result window
+                result_start_time = min(best_windows) * window_sec
+                result_end_time = max(best_windows) * window_sec + window_sec
+
+                st.write(
+                    "**Best Quality Result Window (5 seconds):**",
+                    ", ".join(
+                        [
+                            f"W{idx+1} ({time_range})"
+                            for idx, time_range in zip(best_windows, time_ranges)
+                        ]
+                    ),
+                )
+                st.write(
+                    "**Result Window Time Frame:**",
+                    f"{result_start_time:.1f}-{result_end_time:.1f}s (consecutive {result_end_time - result_start_time:.1f}s window)",
+                )
+            else:
+                st.write("**Best Quality Result Window:**", "No consecutive windows available for 5-second analysis")
+
             # Display tables
             st.subheader("Lead Quality Summary")
             st.table(lead_quality_data)
@@ -378,22 +410,22 @@ if st.session_state.processed:
                 st.write("**Problems by Window:**")
                 st.dataframe(problems_df_data, use_container_width=True)
 
-                st.write("**SNR (dB) by Window:**")
-                st.dataframe(snr_df_data, use_container_width=True)
-
                 st.write("**QRS Amplitude by Window:**")
                 st.dataframe(qrs_amp_df_data, use_container_width=True)
 
-                st.write("**Muscle Artifact by Window:**")
+                st.write("**SNR (dB) by Window:** (snr db value/ flag % value)")
+                st.dataframe(snr_df_data, use_container_width=True)
+
+                st.write("**Muscle Artifact by Window:** (m_a value/ flag % value)")
                 st.dataframe(muscle_art_df_data, use_container_width=True)
 
-                st.write("**Bad Contact by Window:**")
+                st.write("**Bad Contact by Window:** (b_e_c value/ flag % value)")
                 st.dataframe(bad_contact_df_data, use_container_width=True)
 
-                st.write("**Power Interference by Window:**")
+                st.write("**Power Interference by Window:** (p_i value/ flag % value)")
                 st.dataframe(power_int_df_data, use_container_width=True)
 
-                st.write("**Baseline Drift by Window:**")
+                st.write("**Baseline Drift by Window:** (b_d value/ flag % value)")
                 st.dataframe(baseline_drift_df_data, use_container_width=True)
             else:
                 st.write("No windows available for analysis.")
