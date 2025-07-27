@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from scipy.signal import welch, butter, sosfiltfilt
 
 # Clinical lead weights for ECG Quality aggregation
@@ -44,12 +44,12 @@ FLAGS_WEIGHTS: Dict[str, float] = {
 
 # Thresholds for flagging issues for (T_good,T_bad)
 T_GRADES: Dict[str, Tuple[float, float]] = {
-    "Muscle_Artifact": (0.1, 0.3),   #  from 0  to 0.1 is good ,  0.1 - 0.3 is normal , > 0.3 is bad
-    "Bad_Electrode_Contact": (10, 800),  #  RANGE < 10 and > 800 is bad else good 
-    "Powerline_Interference": (0.05, 0.2),    #  from 0  to 0.05 is good ,  0.05 - 0.2 is normal , > 0.2 is bad
+    "Muscle_Artifact": (0.1, 0.3),
+    "Bad_Electrode_Contact": (10, 800),
+    "Powerline_Interference": (0.05, 0.2),
     "Baseline_Drift": (0.02, 0.1),
-    "Low_SNR": (20, 10),  # SNR in dB   from > 18 good , 6 - 18 is normal , < 6 bad
-}    
+    "Low_SNR": (20, 10),
+}
 
 # Mapping of flag names to user-friendly messages
 FLAG_MESSAGES: Dict[str, str] = {
@@ -62,7 +62,9 @@ FLAG_MESSAGES: Dict[str, str] = {
 
 
 def analyze_lead_quality(
-    signal: np.ndarray, sampling_rate: int = 500
+    signal: np.ndarray,
+    sampling_rate: int = 500,
+    next_window_signal: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Compute signal-quality metrics for a single ECG segment.
@@ -109,9 +111,22 @@ def analyze_lead_quality(
     )
     # flags["Powerline_Interference"] = 1.0 if pi > 0.05 else -np.log10(1 - 20 * pi)
 
-    # Baseline drift: <0.5 Hz
-    lf = np.sum(psd[(freqs < 0.5)])
-    bd = lf / total_power
+    # Baseline drift: <0.5 Hz - use 2 windows if next_window_signal is available
+    if next_window_signal is not None:
+        # Concatenate current and next window for baseline drift analysis
+        combined_sig = np.concatenate(
+            [signal, next_window_signal]
+        )
+        combined_sig -= np.mean(combined_sig)
+        freqs_bd, psd_bd = welch(combined_sig, fs=sampling_rate)
+        total_power_bd = np.sum(psd_bd) + 1e-12
+        lf = np.sum(psd_bd[(freqs_bd < 0.5)])
+        bd = lf / total_power_bd
+    else:
+        # Fall back to single window for baseline drift
+        lf = np.sum(psd[(freqs < 0.5)])
+        bd = lf / total_power
+
     flags["Baseline_Drift"] = np.clip(
         (bd - T_GRADES["Baseline_Drift"][0])
         / (T_GRADES["Baseline_Drift"][1] - T_GRADES["Baseline_Drift"][0]),
@@ -131,7 +146,7 @@ def analyze_lead_quality(
     if amp < T_GRADES["Bad_Electrode_Contact"][0]:
         # If amplitude is too low, we consider it a bad contact
         flags["Bad_Electrode_Contact"] = 1.0
-    elif amp >  T_GRADES["Bad_Electrode_Contact"][1] :  
+    elif amp > T_GRADES["Bad_Electrode_Contact"][1]:
         flags["Bad_Electrode_Contact"] = 1.0
         # flags["Bad_Electrode_Contact"] = np.clip(
         #     (amp - T_GRADES["Bad_Electrode_Contact"][0])
@@ -227,7 +242,13 @@ def analyze_ecg_all_leads(
 
         for lead, sig in leads.items():
             seg = sig[i * wlen : (i + 1) * wlen]
-            metrics = analyze_lead_quality(seg, sampling_rate)
+
+            # Get next window for baseline drift calculation if available
+            next_seg = None
+            if i < nwin - 1:  # Not the last window
+                next_seg = sig[(i + 1) * wlen : (i + 2) * wlen]
+
+            metrics = analyze_lead_quality(seg, sampling_rate, next_seg)
             flags = metrics["flags"]
             quality_score = compute_quality_score(flags)
 
@@ -329,13 +350,13 @@ def analyze_ecg_all_leads(
             "b_d": avg_bd,
         }
         total_quality += avg_q * weights.get(lead, 0.0)
-        
-        if avg_q < 0.65 : 
-            error_level+= 0.2
-        if avg_q < 0.85 : 
-            error_level+= 0.02
-      
-    total_quality = total_quality -  error_level   
+
+        if avg_q < 0.65:
+            error_level += 0.2
+        if avg_q < 0.85:
+            error_level += 0.02
+
+    total_quality = total_quality - error_level
 
     # Classification
     if total_quality > 0.85:

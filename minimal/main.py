@@ -215,7 +215,7 @@ if st.session_state.processed:
                         "bad_contact": f"{metrics['values']['b_e_c']:.3f}/{flags.get('Bad_Electrode_Contact', 0):.3f}",
                         "power_int": f"{metrics['values']['p_i']:.3f}/{flags.get('Powerline_Interference', 0):.3f}",
                         "baseline_dr": f"{metrics['values']['b_d']:.3f}/{flags.get('Baseline_Drift', 0):.3f}",
-                        }
+                    }
 
             # Create dataframes for different metrics
             if nwin > 0:
@@ -322,19 +322,39 @@ if st.session_state.processed:
             t = np.arange(len(data["I"])) / SAMPLING_RATE
             fig = make_subplots(rows=3, cols=4, subplot_titles=LEAD_NAMES)
 
-            # Set initial x-axis range (3 seconds)
-            # Check if full screen is enabled
-            x_range = [0, 3]  # Default to 3 seconds
-            if "full_screen" in st.session_state and st.session_state["full_screen"]:
-                # If full screen, extend to 5 seconds
-                st.session_state["full_screen"] = True
-                x_range = [0, 5]
+            # Calculate x-axis range based on best quality windows
+            window_sec = 2.5  # Same as in quality.py
+            if "best_windows_used" in quality and quality["best_windows_used"]:
+                best_windows = quality["best_windows_used"]
+                # Calculate time range for the best consecutive windows (5-second result window)
+                result_start_time = min(best_windows) * window_sec
+                result_end_time = max(best_windows) * window_sec + window_sec
+                # Add small buffer around the best window
+                buffer_time = 1  # 1 second buffer on each side
+                x_range = [
+                    max(0, result_start_time - buffer_time),
+                    min(t[-1], result_end_time + buffer_time),
+                ]
+            else:
+                # Fallback to default 3 seconds if no best windows available
+                x_range = [0, min(3, t[-1])]
 
             # Calculate y-ranges centered around baseline
             y_ranges = {}
             for lead in LEAD_NAMES:
-                baseline = data[lead][0]  # Use first value as baseline
-                y_ranges[lead] = (baseline - 500, baseline + 500)
+                # get min and max values for the lead
+                lead_data = data[lead][
+                    int(x_range[0] * SAMPLING_RATE) : int(x_range[1] * SAMPLING_RATE)
+                ]
+                lead_min = np.min(lead_data)
+                lead_max = np.max(lead_data)
+                # Calculate range centered around baseline (0)
+                baseline = (lead_min + lead_max) / 2
+                range_margin = max(abs(lead_min - baseline), abs(lead_max - baseline))
+                y_ranges[lead] = [
+                    lead_min,
+                    lead_max,
+                ]
 
             # Plot each lead
             for idx, lead in enumerate(LEAD_NAMES):
@@ -396,7 +416,10 @@ if st.session_state.processed:
                     f"{result_start_time:.1f}-{result_end_time:.1f}s (consecutive {result_end_time - result_start_time:.1f}s window)",
                 )
             else:
-                st.write("**Best Quality Result Window:**", "No consecutive windows available for 5-second analysis")
+                st.write(
+                    "**Best Quality Result Window:**",
+                    "No consecutive windows available for 5-second analysis",
+                )
 
             # Display tables
             st.subheader("Lead Quality Summary")
