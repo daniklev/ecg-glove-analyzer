@@ -161,8 +161,8 @@ if st.session_state.processed:
                         # "QRS": f"{lead_info.get('QRS_Amplitude', 0):.2f}",
                         "Status": (
                             "🔴 Poor"
-                            if quality_score < 0.5
-                            else "🟡 Fair" if quality_score < 0.7 else "🟢 Good"
+                            if quality_score < 0.65
+                            else "🟡 Fair" if quality_score < 0.85 else "🟢 Good"
                         ),
                         "Problems": problems_str,
                     }
@@ -210,12 +210,12 @@ if st.session_state.processed:
                         "quality": f"{quality_score:.3f}",
                         "problems": problems_str,
                         "qrs_amp": f"{metrics['values']['qrs_amp']:.2f}",
-                        "snr": f"{metrics['values']['snr']:.2f}/{flags['Low_SNR']:.2f}",
-                        "muscle_art": f"{metrics['values']['m_a']:.3f}/{flags['Muscle_Artifact']:.3f}",
-                        "bad_contact": f"{metrics['values']['b_e_c']:.3f}/{flags['Bad_Electrode_Contact']:.3f}",
-                        "power_int": f"{metrics['values']['p_i']:.3f}/{flags['Powerline_Interference']:.3f}",
-                        "baseline_dr": f"{metrics['values']['b_d']:.3f}/{flags['Baseline_Drift']:.3f}",
-                    }
+                        "snr": f"{metrics['values']['snr']:.2f}/{flags.get('Low_SNR', 0):.2f}",
+                        "muscle_art": f"{metrics['values']['m_a']:.3f}/{flags.get('Muscle_Artifact', 0):.3f}",
+                        "bad_contact": f"{metrics['values']['b_e_c']:.3f}/{flags.get('Bad_Electrode_Contact', 0):.3f}",
+                        "power_int": f"{metrics['values']['p_i']:.3f}/{flags.get('Powerline_Interference', 0):.3f}",
+                        "baseline_dr": f"{metrics['values']['b_d']:.3f}/{flags.get('Baseline_Drift', 0):.3f}",
+                        }
 
             # Create dataframes for different metrics
             if nwin > 0:

@@ -4,15 +4,15 @@ from scipy.signal import welch, butter, sosfiltfilt
 
 # Clinical lead weights for ECG Quality aggregation
 CLINICAL_WEIGHTS: Dict[str, float] = {
-    "I": 0.07,
-    "II": 0.12,
-    "III": 0.06,
-    "aVR": 0.04,
+    "I": 0.08,
+    "II": 0.1,
+    "III": 0.08,
+    "aVR": 0.06,
     "aVL": 0.06,
-    "aVF": 0.09,
+    "aVF": 0.08,
     "V1": 0.10,
     "V2": 0.10,
-    "V3": 0.10,
+    "V3": 0.08,
     "V4": 0.08,
     "V5": 0.09,
     "V6": 0.09,
@@ -35,20 +35,21 @@ AMBULANCE_WEIGHTS: Dict[str, float] = {
 
 FLAGS_WEIGHTS: Dict[str, float] = {
     "Muscle_Artifact": 0.2,
-    "Bad_Electrode_Contact": 0.3,
-    "Powerline_Interference": 0.1,
-    "Baseline_Drift": 0.15,
-    "Low_SNR": 0.25,
+    "Bad_Electrode_Contact": 0.25,
+    "Powerline_Interference": 0.15,
+    "Baseline_Drift": 0.2,
+    "Low_SNR": 0.2,
 }
+
 
 # Thresholds for flagging issues for (T_good,T_bad)
 T_GRADES: Dict[str, Tuple[float, float]] = {
-    "Muscle_Artifact": (0.1, 0.3),
-    "Bad_Electrode_Contact": (200, 600),  # qrs threshold above 0.5
-    "Powerline_Interference": (0.05, 0.2),
+    "Muscle_Artifact": (0.1, 0.3),   #  from 0  to 0.1 is good ,  0.1 - 0.3 is normal , > 0.3 is bad
+    "Bad_Electrode_Contact": (10, 800),  #  RANGE < 10 and > 800 is bad else good 
+    "Powerline_Interference": (0.05, 0.2),    #  from 0  to 0.05 is good ,  0.05 - 0.2 is normal , > 0.2 is bad
     "Baseline_Drift": (0.02, 0.1),
-    "Low_SNR": (18, 6),  # SNR in dB
-}
+    "Low_SNR": (20, 10),  # SNR in dB   from > 18 good , 6 - 18 is normal , < 6 bad
+}    
 
 # Mapping of flag names to user-friendly messages
 FLAG_MESSAGES: Dict[str, str] = {
@@ -127,19 +128,20 @@ def analyze_lead_quality(
     lf = np.sum(psd[(freqs > 0.01) & (freqs < 0.5)])
     bc = lf / total_power
 
-    if amp < qrs_threshold:
+    if amp < T_GRADES["Bad_Electrode_Contact"][0]:
         # If amplitude is too low, we consider it a bad contact
         flags["Bad_Electrode_Contact"] = 1.0
-    else:
-        flags["Bad_Electrode_Contact"] = np.clip(
-            (amp - T_GRADES["Bad_Electrode_Contact"][0])
-            / (
-                T_GRADES["Bad_Electrode_Contact"][1]
-                - T_GRADES["Bad_Electrode_Contact"][0]
-            ),
-            0,
-            1,
-        )
+    elif amp >  T_GRADES["Bad_Electrode_Contact"][1] :  
+        flags["Bad_Electrode_Contact"] = 1.0
+        # flags["Bad_Electrode_Contact"] = np.clip(
+        #     (amp - T_GRADES["Bad_Electrode_Contact"][0])
+        #     / (
+        #         T_GRADES["Bad_Electrode_Contact"][1]
+        #         - T_GRADES["Bad_Electrode_Contact"][0]
+        #     ),
+        #     0,
+        #     1,
+        # )
     # flags["Bad_Electrode_Contact"] = 1.0 if bc > 0.2 else -np.log10(1 - 5 * bc)
 
     # SNR in dB: using bandpass 0.5–40 Hz
@@ -263,6 +265,7 @@ def analyze_ecg_all_leads(
 
     lead_quality: Dict[str, Any] = {}
     total_quality = 0.0
+    error_level = 0.0
 
     for lead in leads.keys():
         if best_consecutive_windows:
@@ -326,11 +329,18 @@ def analyze_ecg_all_leads(
             "b_d": avg_bd,
         }
         total_quality += avg_q * weights.get(lead, 0.0)
+        
+        if avg_q < 0.65 : 
+            error_level+= 0.2
+        if avg_q < 0.85 : 
+            error_level+= 0.02
+      
+    total_quality = total_quality -  error_level   
 
     # Classification
-    if total_quality > 0.8:
+    if total_quality > 0.85:
         classification = "Good"
-    elif total_quality > 0.5:
+    elif total_quality > 0.65:
         classification = "Questionable"
     else:
         classification = "Not usable"
