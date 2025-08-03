@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
-from scipy.signal import welch, butter, sosfiltfilt
+from scipy.signal import welch, butter, sosfiltfilt, iirnotch, tf2sos
 
 # Clinical lead weights for ECG Quality aggregation
 CLINICAL_WEIGHTS: Dict[str, float] = {
@@ -44,11 +44,11 @@ FLAGS_WEIGHTS: Dict[str, float] = {
 
 # Thresholds for flagging issues for (T_good,T_bad)
 T_GRADES: Dict[str, Tuple[float, float]] = {
-    "Muscle_Artifact": (0.1, 0.3),
+    "Muscle_Artifact": (0.035, 0.088),   # prev value  (0.05, 0.1),
     "Bad_Electrode_Contact": (10, 800),
-    "Powerline_Interference": (0.05, 0.2),
-    "Baseline_Drift": (0.02, 0.1),
-    "Low_SNR": (20, 10),
+    "Powerline_Interference": (0.01, 0.05), #  0.01 - 0.05 good detection
+    "Baseline_Drift": (0.02, 0.85), # old (0.02, 0.1),
+    "Low_SNR": (15, 7),   # prev range 20-10
 }
 
 # Mapping of flag names to user-friendly messages
@@ -84,34 +84,141 @@ def analyze_lead_quality(
     # Initialize flags
     flags: Dict[str, float] = {}
 
-    # Muscle artifact: 40–100 Hz excluding 50/60 Hz >10%
+    # Muscle artifact: 35–100 Hz excluding 50/60 Hz >10%
     # hf = np.sum(psd[(freqs > 40) & (freqs < 100)])
-    hf = np.sum(psd[(freqs > 40) & (freqs < 100) & ~((freqs > 49) & (freqs < 51))])
-    ma = hf / total_power
+    # Daniel Code hf = np.sum(psd[(freqs > 40) & (freqs < 100) & ~((freqs > 49) & (freqs < 51))])
+   
+    # 1) Notch-фильтры 50 Гц и 60 Гц в SOS
+    # создаёт коэффициенты IIR-фильтра-«заглушки» на 50 Гц. Q=80: добротность фильтра — высокая Q даёт очень узкий «выкол», чтобы не задеть соседние частоты.
+    # Результат: два массива b50 и a50 — числитель и знаменатель передаточной функции фильтра второго порядка.
+    # Q=50 → средний вырез (~49,5–50,5 Гц) → оптимальный баланс.
+    b50, a50 = iirnotch(50, Q=50, fs=sampling_rate)
+    # конвертирует парочку (b50, a50) в формат SOS (second-order sections). - sosfiltfilt умеет работать только с SOS, а не с обычными коэффициентами.
+    sos50    = tf2sos(b50, a50)
+    b60, a60 = iirnotch(60, Q=50, fs=sampling_rate)
+    sos60    = tf2sos(b60, a60)
+
+    # 2) Применяем notch-фильтры sosfiltfilt: фильтрует сигнал двухпроходно (прямой + обратный проход), чтобы убрать фазовые искажения.
+    sig_notched = sosfiltfilt(sos50, sig) # sig_notched — уже без 50 -60 Гц-компоненты.
+    sig_notched = sosfiltfilt(sos60, sig_notched)
+
+    # 3) PSD (усреднённый периодограммный способ оценить спектральную плотность мощности (PSD): ) методом Welch на окне 2.5 с nperseg: число точек в каждом сегменте для метода Welch.
+    nperseg = int(2.5 * sampling_rate)
+    # welch: вычисляет оценку спектральной плотности мощности.  freqs2: массив частотных бинов (~0…250 Гц). , psd2: мощность сигнала в каждом бине. 
+    freqs2, psd2 = welch(sig_notched, fs=sampling_rate, nperseg=nperseg)
+    # Складываем всю мощность для нормировки (плюс маленькая приписка, чтобы не делить на ноль).
+    total_power2 = np.sum(psd2) + 1e-12
+
+    # 4) Флаг сетевого шума (48–52 и 58–62 Гц)  маска, которая истинна для частот в ±2 Гц вокруг 50 Гц и 60 Гц.
+    mains_bins = ((freqs2 >= 48) & (freqs2 <= 52)) | ((freqs2 >= 58) & (freqs2 <= 62))
+    # Суммируем энергию в этих бинax — это сколько сетевого «гудения» ещё осталось.
+    mains_power = np.sum(psd2[mains_bins])
+    # pi (powerline_interference): отношение сетевого шума ко всей энергии — показатель «грязи» от сети.
+    pi = mains_power / total_power2
+    flags["Powerline_Interference"] = np.clip(
+        (pi - T_GRADES["Powerline_Interference"][0])
+        / (T_GRADES["Powerline_Interference"][1] - T_GRADES["Powerline_Interference"][0]),
+        0,
+        1,
+    )
+   
+     # 5) Флаг мышечного артефакта (35–100 Гц) hf_bins: маска для диапазона высокой частоты, где живёт EMG-шум.
+    hf_bins = (freqs2 >= 35) & (freqs2 <= 100)
+    # Суммарная энергия в этом диапазоне.
+    hf_power = np.sum(psd2[hf_bins])
+    # ma_ratio: доля мышечного шума от общей энергии.
+    ma_ratio = hf_power / total_power2
+
     flags["Muscle_Artifact"] = np.clip(
-        (ma - T_GRADES["Muscle_Artifact"][0])
+       (ma_ratio - T_GRADES["Muscle_Artifact"][0])
         / (T_GRADES["Muscle_Artifact"][1] - T_GRADES["Muscle_Artifact"][0]),
         0,
         1,
     )
-    # flags["Muscle_Artifact"] = 1.0 if ma > 0.1 else -np.log10(1 - 9 * ma)
+        
 
+    
+    # Old Code     
+    """
+    mask = (freqs > 35) & (freqs < 99)
+    bad50 = (freqs >= 48) & (freqs <= 52)
+    bad60 = (freqs >= 58) & (freqs <= 62)
+    hf = np.sum(psd[mask & ~(bad50 | bad60)])
+    ma = hf / total_power
+    flags["Muscle_Artifact"] = np.clip(
+       (ma - T_GRADES["Muscle_Artifact"][0])
+        / (T_GRADES["Muscle_Artifact"][1] - T_GRADES["Muscle_Artifact"][0]),
+        0,
+        1,
+    )
+    flags["Muscle_Artifact"] = 1.0 if ma > 0.1 else -np.log10(1 - 9 * ma)
+    ma_ratio = ma
+    
     # Powerline interference: 49–51 & 59–61 Hz
+    #old code
+    
     p50 = np.sum(psd[(freqs > 49) & (freqs < 51)])
     p60 = np.sum(psd[(freqs > 59) & (freqs < 61)])
     pi = (p50 + p60) / total_power
     flags["Powerline_Interference"] = np.clip(
         (pi - T_GRADES["Powerline_Interference"][0])
-        / (
-            T_GRADES["Powerline_Interference"][1]
-            - T_GRADES["Powerline_Interference"][0]
-        ),
+        / (T_GRADES["Powerline_Interference"][1] - T_GRADES["Powerline_Interference"][0]),
         0,
         1,
     )
     # flags["Powerline_Interference"] = 1.0 if pi > 0.05 else -np.log10(1 - 20 * pi)
+    """
+
 
     # Baseline drift: <0.5 Hz - use 2 windows if next_window_signal is available
+
+    # Code 1
+    """
+    if next_window_signal is not None:
+        # Concatenate current and next window for baseline drift analysis
+        combined_sig = np.concatenate([signal, next_window_signal])
+        # Снимаем DC-компоненту
+        combined_sig -= np.mean(combined_sig)
+        nperseg = len(combined_sig)
+        # Берём весь сигнал одним сегментом, чтобы Δf ≈ 1 / T_total
+        nfft = 2**int(np.ceil(np.log2(nperseg)))
+        freqs_bd, psd_bd = welch(
+            combined_sig,
+            fs=sampling_rate,
+            nperseg=nperseg,
+            nfft=nfft,  # nfft с нулевым дополнением даёт ещё более «мелкий» шаг, не меняя стабильность оценки.
+            window="hann",
+            detrend="constant"  # detrend="constant" убирает токовую составляющую перед оценкой.
+        )
+        total_power_bd = np.sum(psd_bd) + 1e-12
+        lf = np.sum(psd_bd[freqs_bd < 0.5])
+        bd = lf / total_power_bd
+    else:
+        lf = np.sum(psd[freqs < 0.5])
+        bd = lf / total_power
+    """
+    if next_window_signal is not None:
+        combined_sig = np.concatenate([signal, next_window_signal])
+        combined_sig -= combined_sig.mean()
+        freqs_bd, psd_bd = welch(combined_sig, fs=sampling_rate, nperseg=int(1.25*sampling_rate))
+        total_power_bd = psd_bd.sum() + 1e-12
+        lf = psd_bd[freqs_bd < 0.5].sum()
+        bd = lf / total_power_bd
+    else:
+        lf = psd[freqs < 0.5].sum()
+        bd = lf / total_power
+
+    flags["Baseline_Drift"] = np.clip(
+            (bd - T_GRADES["Baseline_Drift"][0])
+            / (T_GRADES["Baseline_Drift"][1] - T_GRADES["Baseline_Drift"][0]),
+            0,
+            1,
+        )
+
+
+    # Baseline drift: <0.5 Hz - use 2 windows if next_window_signal is available
+    # old code
+    """
     if next_window_signal is not None:
         # Concatenate current and next window for baseline drift analysis
         combined_sig = np.concatenate(
@@ -133,6 +240,7 @@ def analyze_lead_quality(
         0,
         1,
     )
+    """
     # flags["Baseline_Drift"] = 1.0 if bd > 0.1 else -np.log10(1 - 10 * bd)
 
     # QRS amplitude
@@ -159,31 +267,46 @@ def analyze_lead_quality(
         # )
     # flags["Bad_Electrode_Contact"] = 1.0 if bc > 0.2 else -np.log10(1 - 5 * bc)
 
-    # SNR in dB: using bandpass 0.5–40 Hz
-    try:
-        sos = butter(2, [0.5, 40], btype="bandpass", fs=sampling_rate, output="sos")
-        clean = sosfiltfilt(sos, sig)
-        noise = sig - clean
-        noise_power = np.mean(noise**2) + 1e-12
-        snr = 10 * np.log10((amp**2) / noise_power)
-    except Exception:
-        # Fallback: simple SNR calculation
-        signal_power = np.mean(sig**2) + 1e-12
-        noise_power = np.var(sig) + 1e-12
-        snr = 10 * np.log10(signal_power / noise_power)
+
+    # SNR in dB: using bandpass 0.5–40 Hz    
+    # 1) Порог и дрейф (подбери эмпирически)
+    sos_hp = butter(4, 1, btype="highpass", fs=sampling_rate, output="sos")
+    clean_hp = sosfiltfilt(sos_hp, sig)
+     
+    amp_threshold   = 5        # 20 µV
+    
+    # 2) Расчёт амплитуды и проверка дрейфа
+    amplitude =  clean_hp.max() - clean_hp.min()
+    no_signal = amplitude < amp_threshold    
+
+    if no_signal:
+        flags["Low_SNR"] = 1.0
+        snr = 0.1
+    else:        
+        try:
+            sos = butter(2, [0.5, 40], btype="bandpass", fs=sampling_rate, output="sos")
+            clean = sosfiltfilt(sos, sig)
+            noise = sig - clean
+            noise_power = np.mean(noise**2) + 1e-12
+            snr = 10 * np.log10((amp**2) / noise_power)
+        except Exception:
+            # Fallback: simple SNR calculation
+            signal_power = np.mean(sig**2) + 1e-12
+            noise_power = np.var(sig) + 1e-12
+            snr = 10 * np.log10(signal_power / noise_power)
 
     flags["Low_SNR"] = np.clip(
-        (snr - T_GRADES["Low_SNR"][0])
-        / (T_GRADES["Low_SNR"][1] - T_GRADES["Low_SNR"][0]),
-        0,
-        1,
-    )
+            (snr - T_GRADES["Low_SNR"][0])
+            / (T_GRADES["Low_SNR"][1] - T_GRADES["Low_SNR"][0]),
+            0,
+            1,
+        )
     # flags["Low_SNR"] = 1.0 if snr < 25 else -np.log10(1 - (snr / 50))
 
     return {
         "flags": flags,
         "values": {
-            "m_a": ma,
+            "m_a": ma_ratio,
             "b_e_c": bc,
             "p_i": pi,
             "b_d": bd,
