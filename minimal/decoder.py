@@ -8,7 +8,7 @@ class ECGPacketDecoder:
     """
     Decode raw ECG packet bytes into 12 standard lead signals.
     """
-
+    
     PC_ADDR = 0x80
     UNIT_ADDR = 0x17
     TYPE_DATA = 0x00
@@ -81,6 +81,7 @@ class ECGPacketDecoder:
             else:
                 # Other packet types: advance one byte
                 i += 1
+            
 
     def _get_leads(self) -> Dict[str, NDArray[np.float64]]:
         """
@@ -106,7 +107,9 @@ class ECGPacketDecoder:
             raw[key] = raw[key][:min_len]
 
         # Add first 3 seconds to beginning of each channel
-        sampling_rate = 500  # Default sampling rate
+
+        # Alex delete code for adding 3 sec data
+        """sampling_rate = 500  # Default sampling rate
         first_3_sec_samples = min(
             3 * sampling_rate, min_len
         )  # 3 seconds worth of samples
@@ -114,6 +117,7 @@ class ECGPacketDecoder:
         for key in raw:
             first_3_sec = raw[key][:first_3_sec_samples]
             raw[key] = np.concatenate([first_3_sec, raw[key]])
+        """
 
         # Derive the four additional leads
         leads = dict(raw)
