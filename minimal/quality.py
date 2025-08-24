@@ -48,7 +48,7 @@ T_GRADES: Dict[str, Tuple[float, float]] = {
     "Bad_Electrode_Contact": (10, 800),
     "Powerline_Interference": (0.01, 0.05), #  0.01 - 0.05 good detection
     "Baseline_Drift": (0.02, 0.85), # old (0.02, 0.1),
-    "Low_SNR": (15, 7),   # prev range 20-10
+    "Low_SNR": (25, 15),   # prev range 20-10
 }
 
 # Mapping of flag names to user-friendly messages
@@ -171,8 +171,7 @@ def analyze_lead_quality(
 
 
     # Baseline drift: <0.5 Hz - use 2 windows if next_window_signal is available
-
-    # Code 1
+    # Code Alex 1
     """
     if next_window_signal is not None:
         # Concatenate current and next window for baseline drift analysis
@@ -197,6 +196,8 @@ def analyze_lead_quality(
         lf = np.sum(psd[freqs < 0.5])
         bd = lf / total_power
     """
+    # Baseline drift: <0.5 Hz - use 2 windows if next_window_signal is available
+    # Code Alex 2
     if next_window_signal is not None:
         combined_sig = np.concatenate([signal, next_window_signal])
         combined_sig -= combined_sig.mean()
@@ -217,7 +218,7 @@ def analyze_lead_quality(
 
 
     # Baseline drift: <0.5 Hz - use 2 windows if next_window_signal is available
-    # old code
+    # old Daniel code
     """
     if next_window_signal is not None:
         # Concatenate current and next window for baseline drift analysis
@@ -273,7 +274,7 @@ def analyze_lead_quality(
     sos_hp = butter(4, 1, btype="highpass", fs=sampling_rate, output="sos")
     clean_hp = sosfiltfilt(sos_hp, sig)
      
-    amp_threshold   = 5        # 20 µV
+    amp_threshold   = 5        # 20 µV GAIN_1MV = 200
     
     # 2) Расчёт амплитуды и проверка дрейфа
     amplitude =  clean_hp.max() - clean_hp.min()

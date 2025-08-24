@@ -168,7 +168,7 @@ _sos_notch_cache = {}
 _sos_hpf_cache = {}
 
 
-def _sos_notch_coeff(freq: int, fs: int):  #  0.977
+def _sos_notch_coeffOrig(freq: int, fs: int):  #  0.977
     key = (freq, fs)
     if key not in _sos_notch_cache:
         w0 = freq / (fs / 2)  
@@ -178,7 +178,7 @@ def _sos_notch_coeff(freq: int, fs: int):  #  0.977
         _sos_notch_cache[key] = tf2sos(b, a)
     return _sos_notch_cache[key]
 
-def _sos_notch_coeffAlex(freq: int, fs: int):   # 0.966
+def _sos_notch_coeff(freq: int, fs: int):   # 0.966
     key = (freq, fs)
     if key not in _sos_notch_cache:
         bw = 4.0  # ширина выреза ±2 Гц
