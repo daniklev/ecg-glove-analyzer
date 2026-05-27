@@ -18,8 +18,12 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QCheckBox,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT
@@ -35,6 +39,7 @@ USER_ROLE = 32  # Qt.UserRole value
 DEFAULT_SIGNAL_COLOR = "#00ffff"  # cyan
 DEFAULT_GRID_COLOR = "#404040"  # dark gray
 VOLTAGE_SCALE = 0.5  # mV per division
+Y_AXIS_RANGE = 200  # fixed ECG y-axis half-range in raw units (≈ ±2 mV at 100 cnt/mV)
 APP_VERSION = "1.0.3"
 
 
@@ -240,24 +245,140 @@ class EcgTab(QWidget):
         plot_layout.addWidget(self.toolbar)
         plot_layout.addWidget(self.canvas)
 
-        # Create vertical splitter between header and plots
+        # --- Per-window quality table (5-sec windows × 12 leads) ---
+        window_quality_widget = QWidget()
+        wq_layout = QVBoxLayout(window_quality_widget)
+        wq_layout.setContentsMargins(0, 0, 0, 0)
+        wq_layout.setSpacing(2)
+
+        wq_title = QLabel("Quality per 5-second window (sliding, step 2.5s)")
+        wq_title.setStyleSheet(
+            "font-weight: bold; color: #e0e0e0; font-size: 12px; margin: 5px;"
+        )
+        wq_title.setFixedHeight(20)
+        wq_layout.addWidget(wq_title)
+
+        self.window_quality_table = QTableWidget()
+        self.window_quality_table.setStyleSheet(
+            """
+            QTableWidget {
+                background-color: #3b3b3b;
+                color: #e0e0e0;
+                gridline-color: #505050;
+                font-size: 11px;
+            }
+            QHeaderView::section {
+                background-color: #2b2b2b;
+                color: #e0e0e0;
+                padding: 4px;
+                border: 1px solid #505050;
+            }
+            """
+        )
+        self.window_quality_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.window_quality_table.verticalHeader().setVisible(False)
+        self.window_quality_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers
+        )
+        wq_layout.addWidget(self.window_quality_table)
+
+        # Create vertical splitter between header, plots and window-quality table
         vertical_splitter = QSplitter(Qt.Orientation.Vertical)
         vertical_splitter.addWidget(header_widget)
         vertical_splitter.addWidget(plot_widget)
+        vertical_splitter.addWidget(window_quality_widget)
 
-        # Set initial sizes - smaller header, larger plot area
-        vertical_splitter.setSizes([180, 600])
+        # Set initial sizes
+        vertical_splitter.setSizes([180, 480, 150])
 
-        # Allow header to be collapsed but not completely hidden
-        vertical_splitter.setCollapsible(
-            0, False
-        )  # Header cannot be completely collapsed
-        vertical_splitter.setCollapsible(
-            1, False
-        )  # Plot area cannot be completely collapsed
+        # Header / plots cannot be completely collapsed, quality table — can
+        vertical_splitter.setCollapsible(0, False)
+        vertical_splitter.setCollapsible(1, False)
+        vertical_splitter.setCollapsible(2, True)
 
         # Add splitter to main layout
         layout.addWidget(vertical_splitter)
+
+    def update_window_quality_table(self) -> None:
+        """Fill self.window_quality_table from quality_results['per_5s_window'].
+        Best window is highlighted in the header."""
+        table = self.window_quality_table
+        table.clearContents()
+        table.setRowCount(0)
+        table.setColumnCount(0)
+
+        quality_results = getattr(self, "quality_scores", None) or {}
+        per_5s_window = quality_results.get("per_5s_window") or []
+        if not per_5s_window:
+            return
+
+        lead_names = list(self.ecg_glove.lead_signals.keys()) if self.ecg_glove else []
+        if not lead_names:
+            return
+
+        best_time = quality_results.get("best_window_time_s")
+        best_idx = None
+        if best_time:
+            for i, w in enumerate(per_5s_window):
+                if (w["start_s"], w["end_s"]) == best_time:
+                    best_idx = i
+                    break
+
+        # Header: Lead + each sliding 5-sec window + a final "Record" column
+        headers = ["Lead"]
+        for i, w in enumerate(per_5s_window):
+            marker = " ★" if i == best_idx else ""
+            headers.append(f"W{i+1}{marker}\n({w['start_s']:.1f}-{w['end_s']:.1f}s)")
+        headers.append("Record")
+
+        table.setRowCount(len(lead_names))
+        table.setColumnCount(len(headers))
+        table.setHorizontalHeaderLabels(headers)
+
+        lead_quality = quality_results.get("lead_quality", {})
+
+        for r, lead in enumerate(lead_names):
+            lead_item = QTableWidgetItem(lead)
+            lead_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            table.setItem(r, 0, lead_item)
+
+            lead_per_5s = lead_quality.get(lead, {}).get("quality_5s_sliding", [])
+            record_q = lead_quality.get(lead, {}).get("whole_record_quality")
+
+            for i, w in enumerate(per_5s_window):
+                q = lead_per_5s[i] if i < len(lead_per_5s) else w["leads"].get(lead)
+                if q is None:
+                    cell_text = "N/A"
+                    color_score = None
+                else:
+                    cell_text = f"{q:.2f}"
+                    color_score = float(q)
+
+                item = QTableWidgetItem(cell_text)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if color_score is not None:
+                    if color_score >= 0.7:
+                        item.setForeground(QColor("#6bff6b"))
+                    elif color_score >= 0.4:
+                        item.setForeground(QColor("#ffd93d"))
+                    else:
+                        item.setForeground(QColor("#ff6b6b"))
+                table.setItem(r, i + 1, item)
+
+            # Record column (per-lead whole-record aggregate)
+            rec_text = f"{record_q:.2f}" if record_q is not None else "N/A"
+            rec_item = QTableWidgetItem(rec_text)
+            rec_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if record_q is not None:
+                if record_q >= 0.7:
+                    rec_item.setForeground(QColor("#6bff6b"))
+                elif record_q >= 0.4:
+                    rec_item.setForeground(QColor("#ffd93d"))
+                else:
+                    rec_item.setForeground(QColor("#ff6b6b"))
+            table.setItem(r, len(headers) - 1, rec_item)
 
     def _sync_xlim(self, ax):
         """Synchronize x-axis limits across all plots and update y-limits individually."""
@@ -280,50 +401,10 @@ class EcgTab(QWidget):
         finally:
             self._syncing = False
 
-    def _update_individual_ylimits(self, xlim):
-        """Update y-limits for each lead individually based on visible x-range."""
-        x_min, x_max = xlim
-
-        # Fixed lead order for mapping axes to leads
-        lead_order = [
-            ("I", "V1"),
-            ("II", "V2"),
-            ("III", "V3"),
-            ("aVR", "V4"),
-            ("aVL", "V5"),
-            ("aVF", "V6"),
-        ]
-
-        ax_index = 0
-        for row_leads in lead_order:
-            for lead in row_leads:
-                if ax_index < len(self.axes):
-                    ax = self.axes[ax_index]
-                    times, signal = self.signals_data.get(
-                        lead, (np.array([]), np.array([]))
-                    )
-
-                    if signal.size > 0 and times.size > 0:
-                        # Find indices within visible x-range
-                        visible_mask = (times >= x_min) & (times <= x_max)
-                        if np.any(visible_mask):
-                            visible_signal = signal[visible_mask]
-                            y_min = np.min(visible_signal)
-                            y_max = np.max(visible_signal)
-
-                            # Add margins to y-axis limits
-                            y_range = y_max - y_min
-                            if y_range > 0:
-                                y_min -= 0.1 * y_range
-                                y_max += 0.1 * y_range
-                            else:
-                                # Handle case where signal is flat
-                                y_min -= 0.1
-                                y_max += 0.1
-
-                            ax.set_ylim(y_min, y_max)
-
-                ax_index += 1
+    def _update_individual_ylimits(self, _xlim):
+        """Enforce fixed y-range (±Y_AXIS_RANGE) on every axis after pan/zoom."""
+        for ax in self.axes:
+            ax.set_ylim(-Y_AXIS_RANGE, Y_AXIS_RANGE)
 
     def _sync_ylim(self):
         """Removed - no longer synchronizing y-axis limits."""
@@ -488,25 +569,21 @@ class EcgTab(QWidget):
                         antialiased=True,
                     )
 
-                    # Set individual y-limits for this lead
-                    y_min = np.min(signal)
-                    y_max = np.max(signal)
-                    y_range = y_max - y_min
-                    if y_range > 0:
-                        y_min -= 0.1 * y_range
-                        y_max += 0.1 * y_range
-                    else:
-                        y_min -= 0.1
-                        y_max += 0.1
-                    ax.set_ylim(y_min, y_max)
+                    # Fixed y-range ±Y_AXIS_RANGE for all leads
+                    ax.set_ylim(-Y_AXIS_RANGE, Y_AXIS_RANGE)
 
                     # Add lead label with quality information
                     if lead in quality_scores:
                         problems = []
                         lead_quality = quality_scores[lead]
-                        quality_text = (
-                            f"{lead} ({lead_quality.get('nk_quality', 'N/A'):.2f})"
+                        nk_val = lead_quality.get("nk_quality")
+                        nk_str = (
+                            f"{nk_val:.2f}"
+                            if isinstance(nk_val, (int, float))
+                            and nk_val == nk_val  # not NaN
+                            else "N/A"
                         )
+                        quality_text = f"{lead} ({nk_str})"
 
                         if lead_quality.get("Low_SNR"):
                             color = "#ff6b6b"  # Red for poor quality
@@ -1083,6 +1160,9 @@ class EcgAnalyzerGUI(QMainWindow):
             # Store quality scores and measurement results
             tab.quality_scores = quality_results
 
+            # Populate per-5s-window quality table
+            tab.update_window_quality_table()
+
             # Analyze ECG if quality is acceptable
             results = tab.ecg_glove.process()
 
@@ -1097,7 +1177,11 @@ class EcgAnalyzerGUI(QMainWindow):
                         {measurements}
                     </td>
                     <td style='width: 50%; vertical-align: top; padding-left: 10px;'>
-                        <b>Signal Quality:</b> {quality}<br>
+                        <b>Total Score:</b> {total_score}<br>
+                        <b>Best Window:</b> {best_window}<br>
+                        <b>Noise:</b> {noise_score}<br>
+                        <b>Movement:</b> {movement_score}<br>
+                        <b>Contact:</b> {contact_score}<br>
                         <br>
                         <b>Electrical Axes:</b><br>
                         {axes}
@@ -1165,27 +1249,113 @@ class EcgAnalyzerGUI(QMainWindow):
                 "<br>".join(axes_list) if axes_list else "No axis data available"
             )
 
-            # Prepare quality
-            quality_text = ""
-            if "overall_quality" in quality_results:
-                overall_quality = quality_results["overall_quality"]
-                if isinstance(overall_quality, (int, float)):
-                    quality_color = (
-                        "#6bff6b"
-                        if overall_quality > 0.7
-                        else "#ffd93d" if overall_quality > 0.4 else "#ff6b6b"
-                    )
-                    quality_text = f"<span style='color: {quality_color}'>{overall_quality:.2f}</span>"
-                else:
-                    quality_text = str(overall_quality)
+            # Prepare Total Score (overall_quality + classification)
+            def _quality_color(q: float) -> str:
+                if q > 0.7:
+                    return "#6bff6b"
+                if q > 0.4:
+                    return "#ffd93d"
+                return "#ff6b6b"
+
+            overall_quality = quality_results.get("overall_quality")
+            classification = quality_results.get("classification")
+            if isinstance(overall_quality, (int, float)):
+                color = _quality_color(float(overall_quality))
+                cls_part = f" — {classification}" if classification else ""
+                total_score_text = (
+                    f"<span style='color: {color}'>{overall_quality:.2f}{cls_part}</span>"
+                )
+            elif overall_quality is not None:
+                total_score_text = str(overall_quality)
             else:
-                quality_text = "Not available"
+                total_score_text = "Not available"
+
+            # Recording quality breakdown by issue category — derived from
+            # whole-record per-lead flags. Each lead contributes a fraction
+            # (active_flags_in_category / total_flags_in_category) weighted
+            # by its clinical importance. 1.0 = no leads flagged, 0.0 = all
+            # leads have all flags in the category active.
+            _CLINICAL_WEIGHTS = {
+                "I": 0.07, "II": 0.12, "III": 0.06, "aVR": 0.04, "aVL": 0.06,
+                "aVF": 0.09, "V1": 0.10, "V2": 0.10, "V3": 0.10, "V4": 0.08,
+                "V5": 0.09, "V6": 0.09,
+            }
+
+            def _category_score(lead_quality_map, flag_names):
+                if not lead_quality_map or not flag_names:
+                    return None
+                total_w = 0.0
+                weighted_penalty = 0.0
+                n_flags = len(flag_names)
+                for lead, lq_data in lead_quality_map.items():
+                    w = _CLINICAL_WEIGHTS.get(lead, 0.08)
+                    active = sum(1 for f in flag_names if lq_data.get(f))
+                    weighted_penalty += w * (active / n_flags)
+                    total_w += w
+                if total_w <= 0:
+                    return None
+                return float(max(0.0, min(1.0, 1.0 - weighted_penalty / total_w)))
+
+            def _format_category(score, label_good, label_mid, label_bad):
+                if score is None:
+                    return "Not available"
+                if score >= 0.85:
+                    label = label_good
+                elif score >= 0.5:
+                    label = label_mid
+                else:
+                    label = label_bad
+                color = _quality_color(score)
+                return f"<span style='color: {color}'>{score:.2f} — {label}</span>"
+
+            lq_map = quality_results.get("lead_quality", {})
+            noise_score_val = _category_score(
+                lq_map, ["Muscle_Artifact", "Powerline_Interference"]
+            )
+            movement_score_val = _category_score(lq_map, ["Baseline_Drift"])
+            contact_score_val = _category_score(lq_map, ["Bad_Electrode_Contact"])
+
+            noise_score_text = _format_category(
+                noise_score_val, "Clean", "Some noise", "Heavy noise"
+            )
+            movement_score_text = _format_category(
+                movement_score_val, "Stable", "Some drift", "Heavy drift"
+            )
+            contact_score_text = _format_category(
+                contact_score_val, "Good contact", "Marginal", "Poor contact"
+            )
+
+            # Prepare Best Window (time range + best 5s quality + classification)
+            def _quality_class(q: float) -> str:
+                if q >= 0.85:
+                    return "Good"
+                if q >= 0.65:
+                    return "Questionable"
+                return "Not usable"
+
+            best_time = quality_results.get("best_window_time_s")
+            best_q = quality_results.get("best_window_quality")
+            if best_time and isinstance(best_q, (int, float)):
+                color = _quality_color(float(best_q))
+                best_cls = _quality_class(float(best_q))
+                best_window_text = (
+                    f"<span style='color: {color}'>"
+                    f"{best_time[0]:.1f}–{best_time[1]:.1f}s "
+                    f"({best_q:.2f} — {best_cls})"
+                    f"</span>"
+                )
+            else:
+                best_window_text = "Not available"
 
             # Format the final result text
             result_text = result_text.format(
                 analysis_lead=analysis_lead,
                 measurements=measurements_text,
-                quality=quality_text,
+                total_score=total_score_text,
+                best_window=best_window_text,
+                noise_score=noise_score_text,
+                movement_score=movement_score_text,
+                contact_score=contact_score_text,
                 axes=axes_text,
             )
 
@@ -1281,25 +1451,21 @@ class EcgAnalyzerGUI(QMainWindow):
                         antialiased=True,
                     )
 
-                    # Set individual y-limits for this lead
-                    y_min = np.min(signal)
-                    y_max = np.max(signal)
-                    y_range = y_max - y_min
-                    if y_range > 0:
-                        y_min -= 0.1 * y_range
-                        y_max += 0.1 * y_range
-                    else:
-                        y_min -= 0.1
-                        y_max += 0.1
-                    ax.set_ylim(y_min, y_max)
+                    # Fixed y-range ±Y_AXIS_RANGE for all leads
+                    ax.set_ylim(-Y_AXIS_RANGE, Y_AXIS_RANGE)
 
                     # Add lead label with quality information
                     if lead in quality_scores:
                         problems = []
                         lead_quality = quality_scores[lead]
-                        quality_text = (
-                            f"{lead} ({lead_quality.get('nk_quality', 'N/A'):.2f})"
+                        nk_val = lead_quality.get("nk_quality")
+                        nk_str = (
+                            f"{nk_val:.2f}"
+                            if isinstance(nk_val, (int, float))
+                            and nk_val == nk_val  # not NaN
+                            else "N/A"
                         )
+                        quality_text = f"{lead} ({nk_str})"
 
                         if lead_quality.get("Low_SNR"):
                             color = "#ff6b6b"  # Red for poor quality

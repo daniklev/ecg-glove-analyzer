@@ -105,7 +105,10 @@ class EcgGlove:
             "function": nk.ecg_peaks,
             "method": peak_method,
             "correct_artifacts": True,
-            "show": True,
+            # Internal NeuroKit2 plotting is not used by our GUI and crashes
+            # (IndexError on NaN indices) when correct_artifacts inserts NaN
+            # R-peaks for noisy signals — see 24.ret.
+            "show": False,
         }
         self.delineate_config = {
             "function": nk.ecg_delineate,
@@ -231,17 +234,21 @@ class EcgGlove:
                 "No decoded lead signals available. Call decode_data first."
             )
 
-        # Analyze all leads using the quality processor
+        # Analyze on ORIGINAL raw signals (before user-selected filters).
+        # If we used lead_signals here, the user's notch / spike-removal /
+        # baseline-correction filters would mask the very interference the
+        # quality analyzer is supposed to detect — and a noisy recording
+        # would be reported as "Good".
         results = self.quality_processor.analyze_all_leads(
             {
-                "lead_signals": self.lead_signals,
+                "lead_signals": self.raw_signals,
                 "cleaned_signals": self.cleaned_signals,
             }
         )
 
         # Store quality scores
         self.quality_scores = {
-            lead: results["lead_quality"][lead] for lead in self.lead_signals.keys()
+            lead: results["lead_quality"][lead] for lead in self.raw_signals.keys()
         }
 
         return cast(Dict[str, Dict[str, Any]], results)
@@ -417,13 +424,34 @@ class EcgGlove:
         # 2. Delineate waves
         waves_results = {}
         for lead, (signals, info) in peak_results.items():
-            fn = self.delineate_config["function"]  # Use get instead of pop
+            rpeaks = info.get("ECG_R_Peaks", [])
+            # correct_artifacts=True may insert NaN entries — drop them and
+            # convert to integer indices required by delineation.
+            if rpeaks is not None and len(rpeaks) > 0:
+                rpeaks_arr = np.asarray(rpeaks, dtype=float)
+                rpeaks_arr = rpeaks_arr[~np.isnan(rpeaks_arr)]
+                rpeaks = rpeaks_arr.astype(int)
+                info["ECG_R_Peaks"] = rpeaks
+
+            # nk.ecg_delineate divides by zero inside listify when rpeaks
+            # is empty or too short for template-based segmentation.
+            if rpeaks is None or len(rpeaks) < 2:
+                waves_results[lead] = {}
+                continue
+            fn = self.delineate_config["function"]
             kwargs = {
                 "sampling_rate": self.sampling_rate,
                 "method": self.delineate_config.get("method", "dwt"),
             }
-            _, waves = fn(cleaned[lead], info["ECG_R_Peaks"], **kwargs)
-            waves_results[lead] = waves
+            try:
+                _, waves = fn(cleaned[lead], rpeaks, **kwargs)
+                waves_results[lead] = waves
+            except (ZeroDivisionError, ValueError, IndexError) as e:
+                print(
+                    f"Warning: wave delineation failed for {lead} "
+                    f"({len(rpeaks)} R-peaks): {e}"
+                )
+                waves_results[lead] = {}
 
         # 3. Compute measurements for your chosen lead
         #    (Or loop over all leads if you like.)

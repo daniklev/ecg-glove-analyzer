@@ -35,8 +35,8 @@ AMBULANCE_WEIGHTS: Dict[str, float] = {
 
 FLAGS_WEIGHTS: Dict[str, float] = {
     "Muscle_Artifact": 0.2,
-    "Bad_Electrode_Contact": 0.25,
-    "Powerline_Interference": 0.15,
+    "Bad_Electrode_Contact": 0.2,
+    "Powerline_Interference": 0.2,
     "Baseline_Drift": 0.2,
     "Low_SNR": 0.2,
 }
@@ -46,9 +46,9 @@ FLAGS_WEIGHTS: Dict[str, float] = {
 T_GRADES: Dict[str, Tuple[float, float]] = {
     "Muscle_Artifact": (0.035, 0.088),   # prev value  (0.05, 0.1),
     "Bad_Electrode_Contact": (10, 800),
-    "Powerline_Interference": (0.01, 0.05), #  0.01 - 0.05 good detection
+    "Powerline_Interference": (0.002, 0.02), # Плохо реагирует на шум  0.01 - 0.05 good detection
     "Baseline_Drift": (0.02, 0.85), # old (0.02, 0.1),
-    "Low_SNR": (25, 15),   # prev range 20-10
+    "Low_SNR": (30, 17),   # prev range 20-10 - 25, 15 
 }
 
 # Mapping of flag names to user-friendly messages
@@ -60,6 +60,28 @@ FLAG_MESSAGES: Dict[str, str] = {
     "Low_SNR": "Low signal-to-noise ratio",
 }
 
+def _band_power(psd, freqs, f0, width):
+    lo, hi = f0 - width, f0 + width
+    m = (freqs >= lo) & (freqs <= hi)
+    if not np.any(m):
+        return 0.0
+    return psd[m].sum()
+
+def _band_power_trapz(freqs, psd, f0, halfwidth):
+    lo, hi = f0 - halfwidth, f0 + halfwidth
+    m = (freqs >= lo) & (freqs <= hi)
+    if not np.any(m):
+        return 0.0
+    # интеграл по частоте (корректнее, чем простая сумма)
+    return float(np.trapz(psd[m], freqs[m]))
+
+def _peak_in_window(freqs, psd, fmin, fmax, fallback):
+    m = (freqs >= fmin) & (freqs <= fmax)
+    if not np.any(m):
+        return float(fallback)
+    sub_f = freqs[m]
+    sub_p = psd[m]
+    return float(sub_f[np.argmax(sub_p)])
 
 def analyze_lead_quality(
     signal: np.ndarray,
@@ -76,10 +98,6 @@ def analyze_lead_quality(
     """
     # Remove DC offset
     sig = signal - np.mean(signal)
-
-    # Estimate power spectral density
-    freqs, psd = welch(sig, fs=sampling_rate)
-    total_power = np.sum(psd) + 1e-12
 
     # Initialize flags
     flags: Dict[str, float] = {}
@@ -98,18 +116,108 @@ def analyze_lead_quality(
     b60, a60 = iirnotch(60, Q=50, fs=sampling_rate)
     sos60    = tf2sos(b60, a60)
 
+
     # 2) Применяем notch-фильтры sosfiltfilt: фильтрует сигнал двухпроходно (прямой + обратный проход), чтобы убрать фазовые искажения.
-    sig_notched = sosfiltfilt(sos50, sig) # sig_notched — уже без 50 -60 Гц-компоненты.
+    sig_notched = sosfiltfilt(sos50, sig) 
+    # sig_notched — уже без 50 -60 Гц-компоненты.
     sig_notched = sosfiltfilt(sos60, sig_notched)
 
-    # 3) PSD (усреднённый периодограммный способ оценить спектральную плотность мощности (PSD): ) методом Welch на окне 2.5 с nperseg: число точек в каждом сегменте для метода Welch.
+    # 3) nperseg для всех Welch-оценок: окно ~2.5 с → Δf ≈ 0.4 Гц
     nperseg = int(2.5 * sampling_rate)
-    # welch: вычисляет оценку спектральной плотности мощности.  freqs2: массив частотных бинов (~0…250 Гц). , psd2: мощность сигнала в каждом бине. 
-    freqs2, psd2 = welch(sig_notched, fs=sampling_rate, nperseg=nperseg)
-    # Складываем всю мощность для нормировки (плюс маленькая приписка, чтобы не делить на ноль).
-    total_power2 = np.sum(psd2) + 1e-12
 
-    # 4) Флаг сетевого шума (48–52 и 58–62 Гц)  маска, которая истинна для частот в ±2 Гц вокруг 50 Гц и 60 Гц.
+    # 4) Флаг сетевого шума (48–52 и 58–62 Гц 100 120)  маска, которая истинна для частот в ±2 Гц вокруг 50 Гц и 60 Гц.
+    
+    x_raw = signal - np.mean(signal)
+    freqs_raw, psd_raw = welch(x_raw, fs=sampling_rate, nperseg=nperseg, window="hann", detrend="constant")
+    total_raw = psd_raw.sum() + 1e-12
+    # адаптивный поиск пиков 50/60 Гц (учтёт дрейф частоты)
+    win50 = (freqs_raw >= 45) & (freqs_raw <= 55)
+    win60 = (freqs_raw >= 55) & (freqs_raw <= 65)
+    f50_peak = freqs_raw[win50][np.argmax(psd_raw[win50])] if np.any(win50) else 50.0
+    f60_peak = freqs_raw[win60][np.argmax(psd_raw[win60])] if np.any(win60) else 60.0
+
+    # мощность вокруг пиков и их гармоник
+    p50  = _band_power(psd_raw, freqs_raw, f50_peak, width=1.5)
+    p60  = _band_power(psd_raw, freqs_raw, f60_peak, width=1.5)
+    p100 = _band_power(psd_raw, freqs_raw, 2.0 * f50_peak, width=1.0) if 2.0 * f50_peak <= freqs_raw[-1] else 0.0
+    p120 = _band_power(psd_raw, freqs_raw, 2.0 * f60_peak, width=1.0) if 2.0 * f60_peak <= freqs_raw[-1] else 0.0
+
+    pi_pre = (p50 + p60 + p100 + p120) / total_raw
+
+    # --- 2) PSD после фильтра (остаток) ---
+    x_post = sig_notched - np.mean(sig_notched)
+    freqs_post, psd_post = welch(x_post, fs=sampling_rate, nperseg=nperseg, window="hann", detrend="constant")
+    total_post = psd_post.sum() + 1e-12
+
+    # измеряем остаток вокруг тех же пиков (чтобы сравнение было честным)
+    p50_r  = _band_power(psd_post, freqs_post, f50_peak, width=1.5)
+    p60_r  = _band_power(psd_post, freqs_post, f60_peak, width=1.5)
+    p100_r = _band_power(psd_post, freqs_post, 2.0 * f50_peak, width=1.0) if 2.0 * f50_peak <= freqs_post[-1] else 0.0
+    p120_r = _band_power(psd_post, freqs_post, 2.0 * f60_peak, width=1.0) if 2.0 * f60_peak <= freqs_post[-1] else 0.0
+
+    pi_post = (p50_r + p60_r + p100_r + p120_r) / total_post
+    # E1: оцениваем флаг по pi_pre (уровень помехи ДО notch), а не по остатку после фильтра —
+    # иначе флаг всегда около нуля и бесполезен.
+    pi = pi_pre
+    flags["Powerline_Interference"] = np.clip(
+        (pi_pre - T_GRADES["Powerline_Interference"][0])
+        / (T_GRADES["Powerline_Interference"][1] - T_GRADES["Powerline_Interference"][0]),
+        0,
+        1,
+    )
+    
+
+    """  очень тяжелая
+    nperseg = int(2.5 * sampling_rate)  # всё окно → Δf ~ 0.4 Гц
+    x_raw = signal - np.mean(signal)
+    freqs_raw, psd_raw = welch(x_raw, fs=sampling_rate, nperseg=nperseg,
+                            window="hann", detrend="constant")
+    total_raw = float(np.trapz(psd_raw, freqs_raw) + 1e-12)
+
+    # адаптивные пики 50/60 Гц
+    f50_peak = _peak_in_window(freqs_raw, psd_raw, 45.0, 55.0, 50.0)
+    f60_peak = _peak_in_window(freqs_raw, psd_raw, 55.0, 65.0, 60.0)
+
+    # интеграция вокруг пиков и гармоник
+    fund_hw  = 1.5  # Δ1
+    harm_hw  = 1.0  # Δk, k>=2
+    harmonics = (1, 2)  # можно (1,2,3) при необходимости
+
+    def _pl_power(freqs, psd, f50, f60):
+        p = 0.0
+        for k in harmonics:
+            hw = fund_hw if k == 1 else harm_hw
+            f50k = k * f50
+            f60k = k * f60
+            if f50k <= freqs[-1]:
+                p += _band_power_trapz(freqs, psd, f50k, hw)
+            if f60k <= freqs[-1]:
+                p += _band_power_trapz(freqs, psd, f60k, hw)
+        return p
+
+    p_raw = _pl_power(freqs_raw, psd_raw, f50_peak, f60_peak)
+    pi_pre = float(p_raw / total_raw)
+
+    # --- 2) PSD ПОСЛЕ фильтра (остаток) ---
+    x_post = sig_notched - np.mean(sig_notched)
+    freqs_post, psd_post = welch(x_post, fs=sampling_rate, nperseg=nperseg,
+                                window="hann", detrend="constant")
+    total_post = float(np.trapz(psd_post, freqs_post) + 1e-12)
+
+    # измеряем остаток вокруг ТЕХ ЖЕ адаптивных пиков
+    p_post = _pl_power(freqs_post, psd_post, f50_peak, f60_peak)
+    pi_post = float(p_post / total_post)
+    pi = pi_pre
+    flags["Powerline_Interference"] = np.clip(
+        (pi_post - T_GRADES["Powerline_Interference"][0])
+        / (T_GRADES["Powerline_Interference"][1] - T_GRADES["Powerline_Interference"][0]),
+        0,
+        1,
+    )
+    """
+    
+    """     
+    # Old version 4) Флаг сетевого шума (48–52 и 58–62 Гц)  маска, которая истинна для частот в ±2 Гц вокруг 50 Гц и 60 Гц.
     mains_bins = ((freqs2 >= 48) & (freqs2 <= 52)) | ((freqs2 >= 58) & (freqs2 <= 62))
     # Суммируем энергию в этих бинax — это сколько сетевого «гудения» ещё осталось.
     mains_power = np.sum(psd2[mains_bins])
@@ -120,9 +228,11 @@ def analyze_lead_quality(
         / (T_GRADES["Powerline_Interference"][1] - T_GRADES["Powerline_Interference"][0]),
         0,
         1,
-    )
-   
-     # 5) Флаг мышечного артефакта (35–100 Гц) hf_bins: маска для диапазона высокой частоты, где живёт EMG-шум.
+    ) 
+    """
+
+    """ 
+    # 5) Флаг мышечного артефакта (35–100 Гц) hf_bins: маска для диапазона высокой частоты, где живёт EMG-шум.
     hf_bins = (freqs2 >= 35) & (freqs2 <= 100)
     # Суммарная энергия в этом диапазоне.
     hf_power = np.sum(psd2[hf_bins])
@@ -134,8 +244,39 @@ def analyze_lead_quality(
         / (T_GRADES["Muscle_Artifact"][1] - T_GRADES["Muscle_Artifact"][0]),
         0,
         1,
-    )
-        
+    ) 
+    """ 
+  
+    # 5) Флаг мышечного артефакта (35–100 Гц) hf_bins: маска для диапазона высокой частоты, где живёт EMG-шум.
+    bw_ma = 1.5
+
+    # маски в PSD после фильтра
+    hf_mask  = (freqs_post >= 35.0) & (freqs_post <= 100.0)
+    ex50     = (freqs_post >= (f50_peak - bw_ma)) & (freqs_post <= (f50_peak + bw_ma))
+    ex60     = (freqs_post >= (f60_peak - bw_ma)) & (freqs_post <= (f60_peak + bw_ma))
+    ex100    = (freqs_post >= 99.0) & (freqs_post <= 101.0)  # 2-я гармоника 50 Гц на границе диапазона
+
+    hf_power_psd = psd_post[hf_mask & ~(ex50 | ex60 | ex100)].sum()
+    ma_ratio_psd = hf_power_psd / (total_post + 1e-12)
+
+    # тайм-домен фолбэк: полоса 35–100 Гц (после notched сигнала)
+    # from scipy.signal import butter, sosfiltfilt
+    sos_ma = butter(4, [35.0, 100.0], btype="bandpass", fs=sampling_rate, output="sos")
+    x_hf   = sosfiltfilt(sos_ma, sig_notched)
+    rms_hf = np.sqrt(np.mean(x_hf**2))
+    rms_all = np.sqrt(np.mean((sig_notched - np.mean(sig_notched))**2)) + 1e-12
+    ma_ratio_td = (rms_hf / rms_all)**2
+
+    # финальная метрика как максимум из PSD- и TD-оценок
+    ma_ratio = max(ma_ratio_psd, ma_ratio_td)        
+
+    flags["Muscle_Artifact"] = np.clip(
+       (ma_ratio - T_GRADES["Muscle_Artifact"][0])
+        / (T_GRADES["Muscle_Artifact"][1] - T_GRADES["Muscle_Artifact"][0]),
+        0,
+        1,
+    ) 
+    
 
     
     # Old Code     
@@ -206,8 +347,10 @@ def analyze_lead_quality(
         lf = psd_bd[freqs_bd < 0.5].sum()
         bd = lf / total_power_bd
     else:
-        lf = psd[freqs < 0.5].sum()
-        bd = lf / total_power
+        # E2: fallback на PSD после notch (с nperseg=2.5·fs → Δf ≈ 0.4 Гц, есть бины < 0.5 Гц).
+        # Раньше использовался welch без nperseg, где ни один бин не попадал < 0.5 Гц → bd ≈ 0.
+        lf = psd_post[freqs_post < 0.5].sum()
+        bd = lf / total_post
 
     flags["Baseline_Drift"] = np.clip(
             (bd - T_GRADES["Baseline_Drift"][0])
@@ -244,65 +387,48 @@ def analyze_lead_quality(
     """
     # flags["Baseline_Drift"] = 1.0 if bd > 0.1 else -np.log10(1 - 10 * bd)
 
-    # QRS amplitude
-    amp = float(np.ptp(sig))
-
-    # Bad electrode contact: low qrs amlitude - flat line or really high qrs amplitude
-    qrs_threshold = 10  # Adjust this threshold based on expected QRS amplitude
-    lf = np.sum(psd[(freqs > 0.01) & (freqs < 0.5)])
-    bc = lf / total_power
-
-    if amp < T_GRADES["Bad_Electrode_Contact"][0]:
-        # If amplitude is too low, we consider it a bad contact
-        flags["Bad_Electrode_Contact"] = 1.0
-    elif amp > T_GRADES["Bad_Electrode_Contact"][1]:
-        flags["Bad_Electrode_Contact"] = 1.0
-        # flags["Bad_Electrode_Contact"] = np.clip(
-        #     (amp - T_GRADES["Bad_Electrode_Contact"][0])
-        #     / (
-        #         T_GRADES["Bad_Electrode_Contact"][1]
-        #         - T_GRADES["Bad_Electrode_Contact"][0]
-        #     ),
-        #     0,
-        #     1,
-        # )
-    # flags["Bad_Electrode_Contact"] = 1.0 if bc > 0.2 else -np.log10(1 - 5 * bc)
-
-
-    # SNR in dB: using bandpass 0.5–40 Hz    
-    # 1) Порог и дрейф (подбери эмпирически)
+    # E6: QRS-амплитуду меряем от сигнала с удалённым дрейфом (HP-фильтр 1 Гц),
+    # иначе baseline drift раздувает ptp и Bad_Electrode_Contact даёт ложноположительные.
     sos_hp = butter(4, 1, btype="highpass", fs=sampling_rate, output="sos")
     clean_hp = sosfiltfilt(sos_hp, sig)
-     
-    amp_threshold   = 5        # 20 µV GAIN_1MV = 200
-    
-    # 2) Расчёт амплитуды и проверка дрейфа
-    amplitude =  clean_hp.max() - clean_hp.min()
-    no_signal = amplitude < amp_threshold    
+    amp = float(np.ptp(clean_hp))
+    bc = amp  # в values["b_e_c"] сохраняем именно амплитуду (так осмысленнее, чем доля LF)
+
+    # E3: Bad electrode contact — плавная оценка между порогами + явная нулевая ветка.
+    t_lo, t_hi = T_GRADES["Bad_Electrode_Contact"]
+    if amp < t_lo or amp > t_hi:
+        flags["Bad_Electrode_Contact"] = 1.0
+    else:
+        flags["Bad_Electrode_Contact"] = 0.0
+
+    # SNR in dB
+    amp_threshold = 5  # порог "нет сигнала" (в единицах исходного сигнала)
+    no_signal = amp < amp_threshold
 
     if no_signal:
-        flags["Low_SNR"] = 1.0
         snr = 0.1
-    else:        
+    else:
         try:
             sos = butter(2, [0.5, 40], btype="bandpass", fs=sampling_rate, output="sos")
             clean = sosfiltfilt(sos, sig)
             noise = sig - clean
-            noise_power = np.mean(noise**2) + 1e-12
-            snr = 10 * np.log10((amp**2) / noise_power)
+            # E4: SNR = средняя мощность сигнала / средняя мощность шума.
+            # Раньше использовался amp² (peak-to-peak)² — это смешивало пик и среднее
+            # и давало смещённые значения SNR для каналов с разной QRS-амплитудой.
+            signal_power = np.mean(clean ** 2) + 1e-12
+            noise_power = np.mean(noise ** 2) + 1e-12
+            snr = 10 * np.log10(signal_power / noise_power)
         except Exception:
-            # Fallback: simple SNR calculation
-            signal_power = np.mean(sig**2) + 1e-12
+            signal_power = np.mean(sig ** 2) + 1e-12
             noise_power = np.var(sig) + 1e-12
             snr = 10 * np.log10(signal_power / noise_power)
 
     flags["Low_SNR"] = np.clip(
-            (snr - T_GRADES["Low_SNR"][0])
-            / (T_GRADES["Low_SNR"][1] - T_GRADES["Low_SNR"][0]),
-            0,
-            1,
-        )
-    # flags["Low_SNR"] = 1.0 if snr < 25 else -np.log10(1 - (snr / 50))
+        (snr - T_GRADES["Low_SNR"][0])
+        / (T_GRADES["Low_SNR"][1] - T_GRADES["Low_SNR"][0]),
+        0,
+        1,
+    )
 
     return {
         "flags": flags,
@@ -434,23 +560,13 @@ def analyze_ecg_all_leads(
             avg_pi = float(np.mean(pi_values))
             avg_bd = float(np.mean(bd_values))
 
-            # Count flags across best windows (flag is present if it appears in >50% of best windows)
-            flag_counts: Dict[str, int] = {k: 0 for k in FLAG_MESSAGES.keys()}
-            for metrics in best_metrics:
-                flags = metrics["flags"]
-                for flag in FLAG_MESSAGES.keys():
-                    if (
-                        flag in flags and flags[flag] > 0.5
-                    ):  # Consider flag active if value > 0.5
-                        flag_counts[flag] += 1
-
-            # Determine problems: any flag present in >50% of best windows
+            # E12: проблема считается, если СРЕДНЕЕ значение флага по выбранным окнам >= 0.5.
+            # Раньше требовалось, чтобы флаг был > 0.5 в >=50% окон — при 2 окнах это означало
+            # "в обоих окнах сразу" и пропускало транзитные события.
             problems: List[str] = []
-            for flag, count in flag_counts.items():
-                if (
-                    len(best_consecutive_windows) > 0
-                    and (count / len(best_consecutive_windows)) >= 0.5
-                ):
+            for flag in FLAG_MESSAGES.keys():
+                vals = [m["flags"].get(flag, 0.0) for m in best_metrics]
+                if vals and float(np.mean(vals)) >= 0.5:
                     problems.append(FLAG_MESSAGES[flag])
         else:
             # Fallback if no windows available

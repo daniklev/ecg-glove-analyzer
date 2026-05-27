@@ -10,7 +10,7 @@ import base64
 
 
 # === Configuration ===
-DATA_DIR = "/Users/danik/Developer/ecg-glove-analyzer/data"  # Directory with .ret files
+DATA_DIR = "/Users/levan\Downloads\ECG 12 Lead Test"  # Directory with .ret files
 SAMPLING_RATE = 500
 BASE_CHANNELS = ["I", "III", "V1", "V2", "V3", "V4", "V5", "V6"]
 LEAD_NAMES = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
@@ -18,7 +18,7 @@ LEAD_NAMES = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5
 st.title("ECG Quality Viewer")
 
 # Initialize processed list
-if "processed" not in st.session_state:
+if "processed" not in st.session_state: 
     st.session_state.processed = []  # each entry: {id, file, cfg, raw, filt}
 
 # Sidebar: Add new ECG
