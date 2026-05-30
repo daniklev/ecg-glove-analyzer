@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -1152,19 +1153,43 @@ class EcgAnalyzerGUI(QMainWindow):
                 enable_smoothing=signal_smoothing,
                 smoothing_window=smoothing_window,
             )
+            t_block_start = time.perf_counter()
             tab.ecg_glove.decode_data(data_bytes)
+            t_after_decode_data = time.perf_counter()
 
             # Analyze quality first
             quality_results = tab.ecg_glove.compute_quality()
+            t_after_quality = time.perf_counter()
 
             # Store quality scores and measurement results
             tab.quality_scores = quality_results
 
             # Populate per-5s-window quality table
+            # (GUI table fill — deliberately EXCLUDED from the timing below)
             tab.update_window_quality_table()
 
             # Analyze ECG if quality is acceptable
+            t_before_process = time.perf_counter()
             results = tab.ecg_glove.process()
+            t_after_process = time.perf_counter()
+
+            # --- Block timings (ms), excluding plotting & table fill ---
+            glove_timing = getattr(tab.ecg_glove, "timing", {}) or {}
+            decode_ms = float(glove_timing.get("decode_ms", 0.0))
+            filter_ms = float(glove_timing.get("filter_ms", 0.0))
+            clean_ms = float(glove_timing.get("clean_ms", 0.0))
+            decode_data_ms = (t_after_decode_data - t_block_start) * 1000.0
+            quality_ms = (t_after_quality - t_after_decode_data) * 1000.0
+            measure_ms = (t_after_process - t_before_process) * 1000.0
+            analysis_ms = quality_ms + measure_ms
+            total_ms = decode_data_ms + quality_ms + measure_ms
+            timing_text = (
+                f"<b>Total:</b> {total_ms:.0f} ms&nbsp;&nbsp;|&nbsp;&nbsp;"
+                f"<b>Filtering:</b> {filter_ms:.0f} ms&nbsp;&nbsp;|&nbsp;&nbsp;"
+                f"<b>Analysis:</b> {analysis_ms:.0f} ms "
+                f"(quality {quality_ms:.0f} + measure {measure_ms:.0f})"
+                f"&nbsp;&nbsp;|&nbsp;&nbsp;decode {decode_ms:.0f} + clean {clean_ms:.0f} ms"
+            )
 
             # Format results for display with HTML formatting in two columns
             result_text = """
@@ -1188,6 +1213,10 @@ class EcgAnalyzerGUI(QMainWindow):
                     </td>
                 </tr>
             </table>
+            <div style='margin-top: 6px; padding-top: 4px; border-top: 1px solid #505050;
+                        color: #9aa0a6; font-size: 10px;'>
+                <b>&#9201; Processing time (excl. plotting &amp; table fill):</b><br>{timing}
+            </div>
             """
 
             # Prepare data for formatting
@@ -1357,6 +1386,7 @@ class EcgAnalyzerGUI(QMainWindow):
                 movement_score=movement_score_text,
                 contact_score=contact_score_text,
                 axes=axes_text,
+                timing=timing_text,
             )
 
             tab.results_text.setText(result_text)

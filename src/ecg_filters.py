@@ -2,6 +2,9 @@ from collections import deque
 from typing import Deque, List
 from enum import Enum
 
+import numpy as np
+from scipy.signal import lfilter
+
 
 class Buffer:
     def __init__(self, buffersize: int):
@@ -60,6 +63,43 @@ class MorphologyFilter:
         self.previous_output = smoothed_output
 
         return smoothed_output
+
+    def process_array(self, signal: np.ndarray) -> np.ndarray:
+        """Vectorized equivalent of calling compute_hpf() sample-by-sample
+        on a freshly-constructed filter.
+
+        Bit-for-bit reproduces the per-sample path:
+          * the input is truncated toward zero (the caller did ``int(y)``),
+          * the first ``buffersize-1`` samples pass through unchanged,
+          * from then on out = trunc(0.7*(x - median8) + 0.3*prev).
+
+        The trailing-window median is vectorized; only the int-truncating
+        feedback (which cannot be expressed as a linear filter) keeps a tight
+        scalar loop — but that loop does O(1) work per sample, not O(taps).
+        """
+        x = np.asarray(signal, dtype=np.float64)
+        n = x.size
+        bs = self.buffer.buffersize  # 8
+        d = np.trunc(x)  # matches Python int() truncation toward zero
+        out = d.copy()
+        if n < bs:
+            # buffer never fills -> every sample returned unchanged
+            return out
+
+        # Median of each trailing window of length bs (sorted()[bs//2]),
+        # for windows ending at indices bs-1 .. n-1.
+        windows = np.lib.stride_tricks.sliding_window_view(d, bs)
+        medians = np.sort(windows, axis=1)[:, bs // 2]
+
+        start = bs - 1  # first index where the buffer is full (8th sample)
+        pre = (d[start:] - medians).tolist()  # x - median, per computed sample
+        prev = 0  # previous_output starts at 0
+        res = []
+        for v in pre:
+            prev = int(0.7 * v + 0.3 * prev)
+            res.append(prev)
+        out[start:] = res
+        return out
 
 
 class NotchEcgFilter:
@@ -769,6 +809,19 @@ class NotchEcgFilter:
         self.indx = (self.indx + 1) % self.max_notch
         return acc
 
+    def process_array(self, signal: np.ndarray) -> np.ndarray:
+        """Vectorized equivalent of get_new_val() over a whole signal.
+
+        get_new_val implements y[n] = Σ_k ar_notch[k]·x[n-k] via a circular
+        buffer — i.e. an FIR filter with zero initial state. That is exactly
+        lfilter(ar_notch, [1.0], x), but evaluated by an optimized C routine
+        instead of a 240-iteration Python loop per sample.
+        """
+        x = np.asarray(signal, dtype=np.float64)
+        if self.max_notch == 0:
+            return x.copy()
+        return lfilter(self.ar_notch, [1.0], x)
+
 
 class HPFilterType(Enum):
     HP005 = "HP005"  # 0.05 Hz cutoff
@@ -816,6 +869,13 @@ class MultiNotchFilter:
             result = notch_filter.get_new_val(result)
         return result
 
+    def process_array(self, signal: np.ndarray) -> np.ndarray:
+        """Apply all notch filters in sequence (vectorized)."""
+        result = np.asarray(signal, dtype=np.float64)
+        for notch_filter in self.filters:
+            result = notch_filter.process_array(result)
+        return result
+
 
 class BaselineFilter:
     """
@@ -839,6 +899,15 @@ class BaselineFilter:
         self.prev_output = output
         return output
 
+    def process_array(self, signal: np.ndarray) -> np.ndarray:
+        """Vectorized first-order high-pass, zero initial state.
+
+        y[n] = alpha*(y[n-1] + x[n] - x[n-1])  <=>
+        a = [1, -alpha], b = [alpha, -alpha].
+        """
+        x = np.asarray(signal, dtype=np.float64)
+        return lfilter([self.alpha, -self.alpha], [1.0, -self.alpha], x)
+
 
 class SmoothingFilter:
     """
@@ -853,6 +922,22 @@ class SmoothingFilter:
         """Apply smoothing"""
         self.buffer.append(val)
         return sum(self.buffer) / len(self.buffer)
+
+    def process_array(self, signal: np.ndarray) -> np.ndarray:
+        """Vectorized trailing moving average matching the deque behavior:
+        out[n] = mean(x[max(0, n-w+1) .. n])  (expanding window at the start).
+        """
+        x = np.asarray(signal, dtype=np.float64)
+        n = x.size
+        if n == 0:
+            return x.copy()
+        w = self.window_size
+        c = np.cumsum(x)
+        out = c.copy()
+        if n > w:
+            out[w:] = c[w:] - c[:-w]
+        denom = np.minimum(np.arange(1, n + 1), w)
+        return out / denom
 
 
 class HiPassFilter:
@@ -898,3 +983,16 @@ class HiPassFilter:
             + (self.HP1 * self.yv[1])
         )
         return self.yv[2]
+
+    def process_array(self, signal: np.ndarray) -> np.ndarray:
+        """Vectorized equivalent of get_new_val() over a whole signal.
+
+        With x' = x/GAIN the recurrence is
+            y[n] = (x'[n-2] + x'[n]) - 2*x'[n-1] + HP0*y[n-2] + HP1*y[n-1]
+        i.e. b = [1, -2, 1]/GAIN, a = [1, -HP1, -HP0], zero initial state.
+        """
+        x = np.asarray(signal, dtype=np.float64)
+        g = self.GAIN
+        b = [1.0 / g, -2.0 / g, 1.0 / g]
+        a = [1.0, -self.HP1, -self.HP0]
+        return lfilter(b, a, x)

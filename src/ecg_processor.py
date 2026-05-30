@@ -57,8 +57,19 @@ class EcgQualityProcessor:
             else self.CLINICAL_LEAD_WEIGHTS
         )
 
-    def analyze_lead_quality(self, signal: np.ndarray, cleaned) -> Dict[str, Any]:
-        """Analyze the quality of a single ECG lead."""
+    def analyze_lead_quality(
+        self, signal: np.ndarray, cleaned, compute_nk: bool = True
+    ) -> Dict[str, Any]:
+        """Analyze the quality of a single ECG lead.
+
+        compute_nk=False skips the (expensive) NeuroKit quality index. It is
+        used for the per-2.5s-window pass: on such short segments the averageQRS
+        template has too few beats and almost always returns NaN, so the value
+        is computed once on the whole lead and reused via the nk_fallback path
+        (see analyze_all_leads / _final_quality_for_segment). The flag-based
+        analysis below — which is what actually ranks the 5-second windows — is
+        unaffected.
+        """
         results = {
             "Muscle_Artifact": False,
             "Bad_Electrode_Contact": False,
@@ -216,16 +227,18 @@ class EcgQualityProcessor:
                 if lf_ratio > 0.25 and drift_std > 130.0:
                     results["Baseline_Drift"] = True
 
-            # Compute quality index based on method
-            quality_idx = nk.ecg_quality(
-                cleaned, sampling_rate=self.sampling_rate
-            )
-            # For averageQRS and other numeric methods
-            quality_idx = np.array(quality_idx, dtype=np.float64)
-            quality_score = float(np.nanmean(quality_idx))
-            # Ensure the score is between 0 and 1
-            quality_score = max(0.0, min(1.0, quality_score))
-            results["nk_quality"] = quality_score
+            # Compute quality index based on method (whole-signal only; see
+            # the compute_nk note in the docstring).
+            if compute_nk:
+                quality_idx = nk.ecg_quality(
+                    cleaned, sampling_rate=self.sampling_rate
+                )
+                # For averageQRS and other numeric methods
+                quality_idx = np.array(quality_idx, dtype=np.float64)
+                quality_score = float(np.nanmean(quality_idx))
+                # Ensure the score is between 0 and 1
+                quality_score = max(0.0, min(1.0, quality_score))
+                results["nk_quality"] = quality_score
 
         except Exception as e:
             print(f"Error calculating power spectrum: {str(e)}")
@@ -285,7 +298,9 @@ class EcgQualityProcessor:
             final    — tech * (0.80 + 0.20 * nk_eff)
             flags    — raw flag dict (for inspection)
         """
-        qres = self.analyze_lead_quality(raw_seg, clean_seg)
+        # Per-window NK is skipped (almost always NaN on 2.5 s); the whole-lead
+        # NK passed in as nk_fallback is used instead.
+        qres = self.analyze_lead_quality(raw_seg, clean_seg, compute_nk=False)
         tech = float(self._calculate_lead_quality_score(qres))
         any_flag_active = any(
             qres.get(k) for k in

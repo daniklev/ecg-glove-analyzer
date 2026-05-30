@@ -1,3 +1,4 @@
+import time
 from typing import Dict, TypeVar, Any, cast, Optional, List
 from numpy.typing import NDArray
 import numpy as np
@@ -95,6 +96,8 @@ class EcgGlove:
         self.cleaned_signals: Dict[str, NDArray[np.float64]] = {}
         self.ecg_data = {"raw_signals": {}, "lead_signals": {}, "cleaned_signals": {}}
         self.quality_scores: Dict[str, Dict[str, Any]] = {}
+        # Per-call processing time (ms) of the most recent decode_data().
+        self.timing: Dict[str, float] = {}
         self.quality_processor = EcgQualityProcessor(sampling_rate=sampling_rate)
         self.clean_config = {
             "function": nk.ecg_clean,
@@ -126,6 +129,7 @@ class EcgGlove:
         Raises:
             ValueError: If no valid ECG data is found in the byte stream.
         """
+        t0 = time.perf_counter()
         decoder = ECGPacketDecoder()
         # Decode the data using the ECGPacketDecoder
         decoded_leads = decoder.decode(data_bytes)
@@ -137,13 +141,30 @@ class EcgGlove:
             lead: np.array(signal_data, dtype=np.float64)
             for lead, signal_data in decoded_leads.items()
         }
+        t_decode = time.perf_counter()
 
-        # Apply filters to get lead signals
+        # Apply filters to get lead signals.
+        #
+        # The filter objects (self.notch / self.morph / ...) are created once
+        # and reused for every lead WITHOUT being reset, so in the original
+        # per-sample loop the filter state flowed from one lead into the next.
+        # Concatenating the leads in iteration order and filtering the whole
+        # sequence in a single vectorized pass reproduces that exact state flow
+        # (including the cross-lead carry-over) while replacing the O(N·taps)
+        # Python loop with optimized array operations.
         self.lead_signals = {}
-        for lead, signal_data in self.raw_signals.items():
-            # First apply bandpass filter
-            filtered = self._filter_signal(signal_data)
-            self.lead_signals[lead] = filtered
+        lead_items = list(self.raw_signals.items())
+        if lead_items:
+            lengths = [sig.size for _, sig in lead_items]
+            concat = np.concatenate([sig for _, sig in lead_items])
+            filtered_concat = self._filter_signal(concat)
+            offset = 0
+            for (lead, _), length in zip(lead_items, lengths):
+                self.lead_signals[lead] = filtered_concat[
+                    offset : offset + length
+                ].copy()
+                offset += length
+        t_filter = time.perf_counter()
 
         # Clean the filtered signals
         if self.clean_config["method"] == "none":
@@ -165,6 +186,15 @@ class EcgGlove:
                 )
                 for lead, signal_data in self.lead_signals.items()
             }
+        t_clean = time.perf_counter()
+
+        # Record per-block processing time (ms) for the most recent call.
+        # Display-only; does not affect any signal-processing logic.
+        self.timing = {
+            "decode_ms": (t_decode - t0) * 1000.0,
+            "filter_ms": (t_filter - t_decode) * 1000.0,
+            "clean_ms": (t_clean - t_filter) * 1000.0,
+        }
 
         # Update ecg_data dictionary
         self.ecg_data["raw_signals"] = self.raw_signals
@@ -296,30 +326,35 @@ class EcgGlove:
           2) Notch filtering (single or multiple frequencies)
           3) High-pass filtering (morphology-based or IIR)
           4) Smoothing (optional)
+
+        Vectorized: each stage processes the whole array at once via its
+        process_array() method. This is mathematically the same causal,
+        zero-initial-state pipeline as the previous sample-by-sample loop,
+        but it replaces the per-sample Python work (notably the ~240-tap
+        notch convolution evaluated per sample) with optimized array ops.
         """
-        out = []
-        for x in raw.tolist():  # iterate sample‐by‐sample
-            y = x
+        y = np.asarray(raw, dtype=np.float64)
+        if y.size == 0:
+            return y.copy()
 
-            # 1) Optional baseline correction
-            if self.enable_baseline_correction and hasattr(self, "baseline_filter"):
-                y = self.baseline_filter.get_new_val(y)
+        # 1) Optional baseline correction
+        if self.enable_baseline_correction and hasattr(self, "baseline_filter"):
+            y = self.baseline_filter.process_array(y)
 
-            # 2) Notch filtering for power‐line interference
-            y = self.notch.get_new_val(y)
+        # 2) Notch filtering for power‐line interference
+        y = self.notch.process_array(y)
 
-            # 3) High-pass filtering
-            if self.spike_removal:
-                y = self.morph.compute_hpf(int(y))
-            else:
-                y = self.hp_filter.get_new_val(y)
+        # 3) High-pass filtering
+        if self.spike_removal:
+            y = self.morph.process_array(y)
+        else:
+            y = self.hp_filter.process_array(y)
 
-            # 4) Optional smoothing
-            if self.enable_smoothing and hasattr(self, "smoothing_filter"):
-                y = self.smoothing_filter.get_new_val(y)
+        # 4) Optional smoothing
+        if self.enable_smoothing and hasattr(self, "smoothing_filter"):
+            y = self.smoothing_filter.process_array(y)
 
-            out.append(y)
-        return np.array(out, dtype=np.float64)
+        return np.asarray(y, dtype=np.float64)
 
     def _validate_signal_data(self) -> None:
         """
